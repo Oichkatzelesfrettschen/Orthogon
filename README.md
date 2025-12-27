@@ -1,10 +1,10 @@
 # Orthogon for Android
 
-A modern, feature-rich implementation of the KenKen logic puzzle for Android. Built with Jetpack Compose and powered by native C algorithms and optional neural AI assistance.
+A modern, feature-rich KenKen logic puzzle game for Android phones and tablets, with Android TV support. Built with Jetpack Compose and powered by native C algorithms with optional neural ML assistance.
 
 ## Download
 
-**[Latest Debug Release (v1.3.1)](https://github.com/Oichkatzelesfrettschen/Orthogon/releases/tag/v1.3.1-debug)**
+**[Latest Release (v0.0.1 Pre-Alpha)](https://github.com/Oichkatzelesfrettschen/Orthogon/releases/tag/v0.0.1)**
 
 | APK | Architecture | Size | Notes |
 |-----|--------------|------|-------|
@@ -41,12 +41,12 @@ A modern, feature-rich implementation of the KenKen logic puzzle for Android. Bu
 Easy • Normal • Hard • Insane • Ludicrous
 
 ### Additional Features
-- **Neural AI Hints**: ONNX-based solver provides intelligent suggestions
+- **Neural ML Hints**: ONNX-based solver provides intelligent suggestions (4x4-9x9)
 - **Quantum Visualization**: Probability hints shown as faint overlays
 - **Victory Animation**: Bouncing tiles celebration on puzzle completion
 - **Save/Load**: Multiple save slots with auto-save
 - **Accessibility**: Full TalkBack/screen reader support
-- **Classic Mode**: Legacy canvas renderer option
+- **Android TV**: D-pad navigation with 10-foot UI focus indicators
 - **Dark Theme**: Modern dark UI throughout
 
 ## Requirements
@@ -126,7 +126,7 @@ Output: `app/build/outputs/apk/debug/`
 
 ## License
 
-GPL-3.0-or-later
+MIT
 
 ---
 
