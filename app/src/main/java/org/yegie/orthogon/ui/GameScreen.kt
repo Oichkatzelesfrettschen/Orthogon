@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.yegie.orthogon.ui.theme.*
+import org.yegie.orthogon.data.GameMode
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -186,25 +187,38 @@ fun GameScreen(
         focusRequester.requestFocus()
     }
 
-    GameTheme(
-        darkTheme = false,
-        largeScreen = isLargeScreen
-    ) {
-        @Suppress("UNUSED_VARIABLE")  // Reserved for future theming
+    // Determine if 8-bit retro mode is active
+    val isRetroMode = uiState.gameMode == GameMode.RETRO_8BIT
+
+    // Wrap with appropriate theme based on mode
+    val themeContent: @Composable (@Composable () -> Unit) -> Unit = { content ->
+        if (isRetroMode) {
+            RetroGameTheme(enabled = true) { content() }
+        } else {
+            GameTheme(darkTheme = false, largeScreen = isLargeScreen) { content() }
+        }
+    }
+
+    themeContent {
         val colors = LocalGameColors.current
         val dimensions = LocalGameDimensions.current
+        val retroMode = if (isRetroMode) LocalRetroMode.current else false
+
+        // Background gradient (8-bit uses solid dark background)
+        val backgroundModifier = if (isRetroMode) {
+            Modifier.background(RetroPalette.black)
+        } else {
+            Modifier.background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF1a1a2e), Color(0xFF16213e))
+                )
+            )
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF1a1a2e),
-                            Color(0xFF16213e)
-                        )
-                    )
-                )
+                .then(backgroundModifier)
                 .focusRequester(focusRequester)
                 .focusTarget()
                 .onKeyEvent { event ->

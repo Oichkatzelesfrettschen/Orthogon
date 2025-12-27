@@ -447,6 +447,7 @@ fun getModeIcon(mode: GameMode): ImageVector {
         GameMode.HINT_MODE -> Icons.Default.Info         // Hints: info
         GameMode.ADAPTIVE -> Icons.Default.Settings      // Adaptive: settings/tune
         GameMode.STORY -> Icons.Default.Menu             // Story: list/book-like
+        GameMode.RETRO_8BIT -> Icons.Default.PlayArrow   // 8-Bit: retro game controller
     }
 }
 

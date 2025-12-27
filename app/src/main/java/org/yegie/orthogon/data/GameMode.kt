@@ -131,6 +131,19 @@ enum class GameMode(
         cFlags = 0x200,
         phase = 4,
         implemented = true  // Stub: no story content yet
+    ),
+
+    // Visual Theme Mode
+    RETRO_8BIT(
+        displayName = "8-Bit",
+        description = "Retro pixel art style with voxel buttons",
+        iconName = "videogame_asset",
+        cFlags = 0x400,
+        phase = 1,
+        implemented = true,
+        extendedTip = "Experience the puzzle in classic 8-bit style! " +
+            "Features pixel art graphics, chunky voxel-style buttons, " +
+            "and the Press Start 2P font for authentic retro vibes."
     );
 
     companion object {
