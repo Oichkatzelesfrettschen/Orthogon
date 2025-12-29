@@ -242,16 +242,36 @@ enum class GridSize(
 
 /**
  * Difficulty levels with human-readable names.
+ *
+ * Matches the 7-level system in keen.c DIFFLIST:
+ *   0=Easy, 1=Normal, 2=Hard, 3=Extreme, 4=Unreasonable, 5=Ludicrous, 6=Incomprehensible
+ *
+ * Difficulty progression:
+ *   - EASY: Basic single-candidate deductions
+ *   - NORMAL: Set deductions (pointing pairs, box/line reduction)
+ *   - HARD: Advanced sets (naked/hidden pairs, X-wing patterns)
+ *   - EXTREME: Forcing chains, region-based elimination
+ *   - UNREASONABLE: Requires some trial-and-error (limited backtracking)
+ *   - LUDICROUS: Extensive trial-and-error, deep recursion
+ *   - INCOMPREHENSIBLE: Maximum difficulty, may require exceptional solving skills
  */
 enum class Difficulty(val level: Int, val displayName: String) {
     EASY(0, "Easy"),
     NORMAL(1, "Normal"),
     HARD(2, "Hard"),
-    INSANE(3, "Insane"),
-    LUDICROUS(4, "Ludicrous");
+    EXTREME(3, "Extreme"),
+    UNREASONABLE(4, "Unreasonable"),
+    LUDICROUS(5, "Ludicrous"),
+    INCOMPREHENSIBLE(6, "Incomprehensible");
 
     companion object {
         fun fromInt(level: Int): Difficulty = entries.find { it.level == level } ?: NORMAL
         val DEFAULT = NORMAL
+
+        /** Maximum difficulty available for Classik flavor (3x3-9x9 grids) */
+        val CLASSIK_MAX = LUDICROUS
+
+        /** Maximum difficulty available for Kenning flavor (3x3-16x16 grids) */
+        val KENNING_MAX = INCOMPREHENSIBLE
     }
 }

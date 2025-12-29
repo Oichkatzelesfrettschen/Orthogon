@@ -11,6 +11,14 @@ import android.content.Context
 import org.yegie.keenkenning.KeenModel
 import org.yegie.keenkenning.NeuralKeenGenerator
 
+/**
+ * Result of puzzle generation - either success with model or failure with error message.
+ */
+sealed class PuzzleResult {
+    data class Success(val model: KeenModel) : PuzzleResult()
+    data class Failure(val errorMessage: String) : PuzzleResult()
+}
+
 interface PuzzleRepository {
     suspend fun generatePuzzle(
         context: Context, // Needed for Neural Generator asset loading
@@ -20,7 +28,7 @@ interface PuzzleRepository {
         seed: Long,
         useAI: Boolean,
         gameMode: GameMode = GameMode.STANDARD
-    ): KeenModel
+    ): PuzzleResult
 }
 
 class PuzzleRepositoryImpl : PuzzleRepository {
@@ -33,14 +41,22 @@ class PuzzleRepositoryImpl : PuzzleRepository {
         seed: Long,
         useAI: Boolean,
         gameMode: GameMode
-    ): KeenModel {
+    ): PuzzleResult {
         // Run on IO dispatcher
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val builder = org.yegie.keenkenning.KeenModelBuilder()
             // Always compute ML probabilities for Smart Hints availability
             // The 'useML' parameter now only affects tracking (isMlGenerated badge)
             // Pass game mode flags to C layer for mode-specific generation
-            builder.build(context, size, diff, multOnly, seed, true, gameMode.cFlags)
+            val model = builder.build(context, size, diff, multOnly, seed, true, gameMode.cFlags)
+
+            if (model != null) {
+                PuzzleResult.Success(model)
+            } else {
+                // Get error message from builder for user feedback
+                val errorMsg = builder.lastJniError ?: "Puzzle generation failed"
+                PuzzleResult.Failure(errorMsg)
+            }
         }
     }
 }

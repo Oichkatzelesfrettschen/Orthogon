@@ -21,6 +21,7 @@ import org.yegie.keenkenning.KeenModel
 import org.yegie.keenkenning.data.GameMode
 import org.yegie.keenkenning.data.PuzzleRepository
 import org.yegie.keenkenning.data.PuzzleRepositoryImpl
+import org.yegie.keenkenning.data.PuzzleResult
 import org.yegie.keenkenning.data.SaveManager
 import org.yegie.keenkenning.data.SaveSlotInfo
 import org.yegie.keenkenning.data.StoryChapter
@@ -82,9 +83,19 @@ class GameViewModel : ViewModel() {
         currentGameMode = gameMode
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val model = repository.generatePuzzle(context, size, effectiveDiff, multOnly, seed, useAI, gameMode)
-            loadModel(model, effectiveDiff, isMlGenerated = useAI, gameMode = gameMode)
+            _uiState.update { it.copy(isLoading = true, showErrorDialog = false, errorMessage = null) }
+            when (val result = repository.generatePuzzle(context, size, effectiveDiff, multOnly, seed, useAI, gameMode)) {
+                is PuzzleResult.Success -> {
+                    loadModel(result.model, effectiveDiff, isMlGenerated = useAI, gameMode = gameMode)
+                }
+                is PuzzleResult.Failure -> {
+                    _uiState.update { it.copy(
+                        isLoading = false,
+                        showErrorDialog = true,
+                        errorMessage = result.errorMessage
+                    ) }
+                }
+            }
         }
     }
 
@@ -141,8 +152,10 @@ class GameViewModel : ViewModel() {
         0 -> "Easy"
         1 -> "Normal"
         2 -> "Hard"
-        3 -> "Insane"    // Maps to C's DIFF_EXTREME - hard but logically solvable
-        4 -> "Ludicrous" // Maps to C's DIFF_UNREASONABLE - may require guessing
+        3 -> "Extreme"         // Forcing chains, region analysis
+        4 -> "Unreasonable"    // May require some guessing
+        5 -> "Ludicrous"       // Extensive trial-and-error
+        6 -> "Incomprehensible" // Maximum difficulty
         else -> "Unknown"
     }
 
@@ -368,6 +381,10 @@ class GameViewModel : ViewModel() {
     
     fun toggleInfoDialog() {
         _uiState.update { it.copy(showInfoDialog = !it.showInfoDialog) }
+    }
+
+    fun dismissErrorDialog() {
+        _uiState.update { it.copy(showErrorDialog = false, errorMessage = null) }
     }
 
     fun toggleSettingsDialog() {

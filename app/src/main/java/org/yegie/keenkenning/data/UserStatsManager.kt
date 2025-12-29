@@ -354,11 +354,13 @@ class UserStatsManager(context: Context) {
         // Map adjusted score to difficulty
         adjustedScore = adjustedScore.coerceIn(0f, 1f)
         return when {
-            adjustedScore < 0.25f -> 0  // Easy
-            adjustedScore < 0.45f -> 1  // Normal
-            adjustedScore < 0.65f -> 2  // Hard
-            adjustedScore < 0.85f -> 3  // Insane
-            else -> 4                   // Ludicrous
+            adjustedScore < 0.20f -> 0  // Easy
+            adjustedScore < 0.35f -> 1  // Normal
+            adjustedScore < 0.50f -> 2  // Hard
+            adjustedScore < 0.65f -> 3  // Extreme
+            adjustedScore < 0.80f -> 4  // Unreasonable
+            adjustedScore < 0.92f -> 5  // Ludicrous
+            else -> 6                   // Incomprehensible
         }
     }
 

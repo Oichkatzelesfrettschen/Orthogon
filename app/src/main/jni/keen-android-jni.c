@@ -74,8 +74,8 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
         return retval;
     }
 
-    if (diff < 0 || diff > 4) {
-        char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Difficulty must be 0-4");
+    if (diff < 0 || diff > 6) {
+        char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Difficulty must be 0-6");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;

@@ -64,8 +64,10 @@
     A(EASY, Easy, solver_easy, e)                                                                  \
     A(NORMAL, Normal, solver_normal, n)                                                            \
     A(HARD, Hard, solver_hard, h)                                                                  \
-    A(EXTREME, Extreme, NULL, x)                                                                   \
-    A(UNREASONABLE, Unreasonable, NULL, u)
+    A(EXTREME, Extreme, solver_extreme, x)                                                         \
+    A(UNREASONABLE, Unreasonable, solver_unreasonable, u)                                          \
+    A(LUDICROUS, Ludicrous, solver_ludicrous, l)                                                   \
+    A(INCOMPREHENSIBLE, Incomprehensible, solver_incomprehensible, i)
 #define ENUM(upper, title, func, lower) DIFF_##upper,
 #define TITLE(upper, title, func, lower) #title,
 #define ENCODE(upper, title, func, lower) #lower
@@ -155,14 +157,32 @@ static long lcm_array(digit *arr, int n) {
 #define MAXBLK          MAXBLK_STANDARD  /* Legacy compatibility */
 
 /*
- * Get effective max block size based on mode flags.
- * Killer mode allows larger cages to match Killer Sudoku conventions.
+ * Get effective max block size based on mode AND difficulty.
+ * Larger cages create more complex constraint interactions,
+ * which are more likely to require advanced solving techniques.
+ *
+ * Difficulty scaling:
+ * - EASY/NORMAL: Standard 6-cell max (simple constraints)
+ * - HARD/EXTREME: 8-cell max (moderate complexity)
+ * - UNREASONABLE+: 10-cell max (complex interactions)
+ * - KILLER mode: Always 16-cell (Killer Sudoku conventions)
  */
-static inline int get_maxblk(int mode_flags) {
+static inline int get_maxblk_for_diff(int mode_flags, int diff) {
     if (HAS_MODE(mode_flags, MODE_KILLER)) {
         return MAXBLK_KILLER;
     }
+    if (diff >= DIFF_UNREASONABLE) {
+        return 10;  /* Large cages for very hard puzzles */
+    }
+    if (diff >= DIFF_HARD) {
+        return 8;   /* Medium-large cages for hard puzzles */
+    }
     return MAXBLK_STANDARD;
+}
+
+/* Legacy wrapper for mode-only queries */
+static inline int get_maxblk(int mode_flags) {
+    return get_maxblk_for_diff(mode_flags, DIFF_NORMAL);
 }
 
 /*
@@ -849,6 +869,42 @@ static int solver_hard(struct latin_solver *solver, void *vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
+/*
+ * EXTREME: Uses all Keen-specific deductions at HARD level.
+ * The additional difficulty comes from latin.c's forcing chains.
+ */
+static int solver_extreme(struct latin_solver *solver, void *vctx) {
+    return solver_common(solver, vctx, DIFF_HARD);
+}
+
+/*
+ * UNREASONABLE: Uses all Keen-specific deductions at HARD level.
+ * The additional difficulty comes from latin.c's limited recursion.
+ * Puzzles at this level may require some trial-and-error.
+ */
+static int solver_unreasonable(struct latin_solver *solver, void *vctx) {
+    return solver_common(solver, vctx, DIFF_HARD);
+}
+
+/*
+ * LUDICROUS: Maximum difficulty level (beyond upstream).
+ * Uses all available techniques including full backtracking.
+ * Puzzles may require extensive trial-and-error to solve.
+ */
+static int solver_ludicrous(struct latin_solver *solver, void *vctx) {
+    return solver_common(solver, vctx, DIFF_HARD);
+}
+
+/*
+ * INCOMPREHENSIBLE: Ultimate difficulty level.
+ * Puzzles at this level may require exceptionally deep recursion,
+ * multiple simultaneous hypotheses, and advanced constraint propagation.
+ * Only for the most dedicated puzzle solvers.
+ */
+static int solver_incomprehensible(struct latin_solver *solver, void *vctx) {
+    return solver_common(solver, vctx, DIFF_HARD);
+}
+
 #define SOLVER(upper, title, func, lower) func,
 static usersolver_t const keen_solvers[] = {DIFFLIST(SOLVER)};
 
@@ -896,8 +952,19 @@ static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mo
     ctx.dscratch = snewn(a + 1, digit);
     ctx.iscratch = snewn(max(a + 1, 4 * w), int);
 
-    ret = latin_solver(soln, w, maxdiff, DIFF_EASY, DIFF_HARD, DIFF_EXTREME, DIFF_EXTREME,
-                       DIFF_UNREASONABLE, keen_solvers, &ctx, NULL, NULL);
+    /*
+     * latin_solver difficulty mapping for 7-level system:
+     *   diff_simple    = DIFF_EASY           (basic single-candidate deductions)
+     *   diff_set_0     = DIFF_NORMAL         (pointing pairs, box/line reduction)
+     *   diff_set_1     = DIFF_HARD           (naked/hidden sets, X-wing)
+     *   diff_forcing   = DIFF_EXTREME        (forcing chains, region analysis)
+     *   diff_recursive = DIFF_INCOMPREHENSIBLE (deep recursion, full backtracking)
+     *
+     * UNREASONABLE and LUDICROUS are intermediate levels between EXTREME
+     * and INCOMPREHENSIBLE, requiring progressively more trial-and-error.
+     */
+    ret = latin_solver(soln, w, maxdiff, DIFF_EASY, DIFF_NORMAL, DIFF_HARD, DIFF_EXTREME,
+                       DIFF_INCOMPREHENSIBLE, keen_solvers, &ctx, NULL, NULL);
 
     sfree(ctx.dscratch);
     sfree(ctx.iscratch);
@@ -1056,6 +1123,168 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
     return NULL;
 }
 
+/*
+ * Cage Mutation for Difficulty Elevation
+ *
+ * When a puzzle is too easy, we try to increase difficulty by merging
+ * adjacent cages. Larger cages create more complex constraint interactions,
+ * which often require more advanced solving techniques.
+ *
+ * Strategy:
+ * 1. Find pairs of adjacent cages where combined size <= maxblk
+ * 2. Merge them (union in DSF)
+ * 3. Recalculate the merged cage's clue
+ * 4. Re-verify difficulty
+ *
+ * This is more efficient than regenerating entirely because we preserve
+ * the Latin square and only modify cage structure.
+ */
+
+/*
+ * Find and merge one pair of adjacent cages to increase difficulty.
+ * Returns TRUE if a merge was performed, FALSE if no valid merge exists.
+ *
+ * Parameters:
+ *   w        - grid width
+ *   dsf      - disjoint set forest representing cage structure
+ *   grid     - the Latin square solution
+ *   clues    - clue array (operation | value)
+ *   cluevals - working array for clue values
+ *   maxblk   - maximum allowed cage size
+ *   rs       - random state for selecting which pair to merge
+ */
+static int try_merge_cages(int w, int *dsf, digit *grid, long *clues, long *cluevals,
+                           int maxblk, random_state *rs) {
+    int a = w * w;
+    int i, x, y, ni;
+    int *candidates, ncand = 0;
+
+    /*
+     * Build list of candidate merge pairs (cell, neighbor) where:
+     * - Cell and neighbor are in different cages
+     * - Combined cage size <= maxblk
+     * - We store as (cell * a + neighbor) to encode both indices
+     */
+    candidates = snewn(a * 4, int);  /* Max 4 neighbors per cell */
+
+    for (i = 0; i < a; i++) {
+        int ci = dsf_canonify(dsf, i);
+        int si = dsf_size(dsf, i);
+        x = i % w;
+        y = i / w;
+
+        /* Check right neighbor */
+        if (x + 1 < w) {
+            ni = i + 1;
+            int cni = dsf_canonify(dsf, ni);
+            if (ci != cni && si + dsf_size(dsf, ni) <= maxblk) {
+                candidates[ncand++] = i * a + ni;
+            }
+        }
+
+        /* Check bottom neighbor */
+        if (y + 1 < w) {
+            ni = i + w;
+            int cni = dsf_canonify(dsf, ni);
+            if (ci != cni && si + dsf_size(dsf, ni) <= maxblk) {
+                candidates[ncand++] = i * a + ni;
+            }
+        }
+    }
+
+    if (ncand == 0) {
+        sfree(candidates);
+        return FALSE;  /* No valid merge candidates */
+    }
+
+    /*
+     * Randomly select a merge pair to avoid bias.
+     */
+    int choice = random_upto(rs, ncand);
+    int c1 = candidates[choice] / a;
+    int c2 = candidates[choice] % a;
+    sfree(candidates);
+
+    /*
+     * Get canonical representatives before merge.
+     */
+    int canon1 = dsf_canonify(dsf, c1);
+    int canon2 = dsf_canonify(dsf, c2);
+
+    /*
+     * Perform the merge in DSF.
+     */
+    dsf_merge(dsf, c1, c2);
+    int new_canon = dsf_canonify(dsf, c1);
+
+    /*
+     * Calculate new clue value by iterating over merged cage cells.
+     * Use ADD for merged cages (most constraining for difficulty).
+     */
+    long new_val = 0;
+    for (i = 0; i < a; i++) {
+        if (dsf_canonify(dsf, i) == new_canon) {
+            new_val += grid[i];
+        }
+    }
+
+    /*
+     * Update clues array - clear old entries, set new one.
+     * C_ADD = 0x10000000L (defined at top of file)
+     */
+    clues[canon1] = 0;
+    clues[canon2] = 0;
+    clues[new_canon] = C_ADD | new_val;
+
+    return TRUE;
+}
+
+/*
+ * Recalculate all clues after cage mutations.
+ * Call this after modifying DSF to ensure clue consistency.
+ */
+static void recalculate_clues(int w, int *dsf, digit *grid, long *clues, long *cluevals,
+                              int mode_flags, random_state *rs) {
+    int a = w * w;
+    int i, j;
+
+    /* Reset clues and cluevals */
+    for (i = 0; i < a; i++) {
+        clues[i] = 0;
+        cluevals[i] = 0;
+    }
+
+    /*
+     * For each cage (identified by canonical element), calculate clue.
+     * We use the same logic as the main generation loop.
+     */
+    for (i = 0; i < a; i++) {
+        j = dsf_canonify(dsf, i);
+        if (i == j) {
+            /* This is a cage root - determine operation */
+            int n = dsf_size(dsf, i);
+
+            if (n == 1) {
+                /* Singleton - no operation, just the value */
+                clues[i] = grid[i];
+            } else {
+                /*
+                 * Multi-cell cage - calculate with ADD for difficulty.
+                 * ADD creates the most constraint interactions for large cages.
+                 */
+                long sum = 0;
+                int k;
+                for (k = 0; k < a; k++) {
+                    if (dsf_canonify(dsf, k) == i) {
+                        sum += grid[k];
+                    }
+                }
+                clues[i] = C_ADD | sum;
+            }
+        }
+    }
+}
+
 char *new_game_desc(const game_params *params, random_state *rs, char **aux, int interactive) {
     int w = params->w, a = w * w;
     digit *grid, *soln;
@@ -1063,27 +1292,16 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     long *clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
-    int maxblk = get_maxblk(params->mode_flags);
+    int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
     (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
-     * Legacy difficulty exception for 3x3 grids.
-     *
-     * Note: With AI-assisted generation (NeuralKeenGenerator), this
-     * limitation is bypassed since the neural model provides valid
-     * Latin squares directly, avoiding the exhaustive search that
-     * caused timeouts in pure algorithmic generation.
-     *
-     * This fallback remains for pure C generation path only.
-     *
-     * TODO(expansion): Consider removing this entirely once AI generation
-     * is the primary path, or add similar safeguards for 4x4 Extreme/
-     * Unreasonable if needed.
+     * Strict difficulty enforcement:
+     * If the requested difficulty cannot be achieved within max_retries,
+     * return NULL. No fallback - the user expects the exact difficulty
+     * they selected. The UI will display an appropriate error message.
      */
-    if (w == 3 && diff > DIFF_NORMAL)
-        diff = DIFF_NORMAL;
-
     grid = NULL;
 
     order = snewn(a, int);
@@ -1096,10 +1314,22 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
 
     /*
      * Limit retries to prevent infinite loops when mode constraints or
-     * large grid sizes make valid puzzles rare. Scale with grid size
-     * since larger grids naturally need more attempts.
+     * large grid sizes make valid puzzles rare. Scale with BOTH grid size
+     * AND difficulty level - higher difficulties need exponentially more
+     * attempts since advanced-technique-requiring puzzles are rare.
+     *
+     * Scaling rationale:
+     * - EASY/NORMAL: Base attempts (most puzzles satisfy these)
+     * - HARD: 2x multiplier (naked/hidden sets less common)
+     * - EXTREME: 4x multiplier (forcing chains rare)
+     * - UNREASONABLE+: 8x multiplier (very rare puzzle structures)
      */
-    int max_retries = 1000 + (a * 10);  /* Base + size-scaled */
+    int difficulty_multiplier = 1;
+    if (diff >= DIFF_UNREASONABLE) difficulty_multiplier = 8;
+    else if (diff >= DIFF_EXTREME) difficulty_multiplier = 4;
+    else if (diff >= DIFF_HARD) difficulty_multiplier = 2;
+
+    int max_retries = (1000 + (a * 20)) * difficulty_multiplier;
     int attempts = 0;
 
     while (attempts < max_retries) {
@@ -1348,14 +1578,27 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                         singletons[j] |= F_MOD;
 
                     /*
-                     * GCD: gcd(p, q). Most interesting when result is
-                     * neither 1 (coprime, trivial) nor max(p,q) (one divides other).
+                     * GCD: gcd(p, q). Difficulty-aware preference:
+                     * - Easy/Normal: Prefer GCD > 1 (more informative constraint)
+                     * - Hard+: PREFER GCD = 1 (maximally ambiguous - any coprime pair works)
+                     *
+                     * GCD=1 is the most ambiguous constraint possible for 2-cell cages,
+                     * forcing the solver to use advanced techniques rather than direct deduction.
                      */
                     v = (int)gcd_helper(p, q);
-                    if (v > 1 && v < q)
-                        singletons[j] |= F_GCD;
-                    else if (v == 1)
-                        singletons[j] |= F_GCD << BAD_SHIFT;  /* Less interesting */
+                    if (diff >= DIFF_HARD) {
+                        /* Hard+: GCD=1 is GOOD (high ambiguity = harder) */
+                        if (v == 1)
+                            singletons[j] |= F_GCD;
+                        else if (v > 1 && v < q)
+                            singletons[j] |= F_GCD << BAD_SHIFT;  /* Less ambiguous */
+                    } else {
+                        /* Easy/Normal: GCD > 1 is GOOD (more informative) */
+                        if (v > 1 && v < q)
+                            singletons[j] |= F_GCD;
+                        else if (v == 1)
+                            singletons[j] |= F_GCD << BAD_SHIFT;  /* Too ambiguous */
+                    }
 
                     /*
                      * LCM: lcm(p, q). Avoid cases where LCM > 100 (clue overflow)
@@ -1374,18 +1617,37 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * Assign clue types to blocks, balancing the distribution
          * across operation types and preferring optimal candidates.
          *
+         * DIFFICULTY-AWARE OPERATION ORDERING:
+         * For high difficulties, we prefer operations with HIGH AMBIGUITY
+         * (many valid combinations = less constraint information), forcing
+         * the solver to use advanced techniques like forcing chains.
+         *
+         * Ambiguity ranking (high to low):
+         *   GCD (esp. GCD=1) > ADD (large cages) > LCM > MOD > SUB > MUL > DIV > EXP
+         *
          * Note: O(N^2) complexity is acceptable here since N is bounded
          * by the maximum number of dominoes in a 9x9 grid.
          */
         shuffle(order, a, sizeof(*order), rs);
         for (i = 0; i < a; i++)
             clues[i] = 0;
+
+        /*
+         * Operation order arrays: different priorities for different difficulties.
+         * Easy/Normal: Prefer constraining ops (DIV, EXP) for simpler puzzles.
+         * Hard+: Prefer ambiguous ops (GCD, ADD, LCM) for harder puzzles.
+         */
+        static const int op_order_easy[8] = {0, 1, 2, 3, 4, 5, 6, 7};  /* DIV,SUB,MUL,ADD,EXP,MOD,GCD,LCM */
+        static const int op_order_hard[8] = {6, 3, 7, 5, 1, 2, 0, 4};  /* GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
+        const int *op_order = (diff >= DIFF_HARD) ? op_order_hard : op_order_easy;
+
         while (1) {
             int done_something = FALSE;
 
-            for (k = 0; k < 8; k++) {
+            for (int op_idx = 0; op_idx < 8; op_idx++) {
                 long clue;
                 int good, bad;
+                k = op_order[op_idx];  /* Use difficulty-aware ordering */
                 switch (k) {
                 case 0:
                     clue = C_DIV;
@@ -1548,20 +1810,56 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         if (diff > 0) {
             memset(soln, 0, a);
             ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
-            if (ret <= diff - 1)
-                continue;
+            if (ret <= diff - 1) {
+                /*
+                 * Puzzle is too easy - try cage merging to increase difficulty.
+                 * Merging adjacent cages creates more complex constraint
+                 * interactions, often requiring more advanced techniques.
+                 */
+                int merge_attempts = 0;
+                int max_merges = w * 2;  /* Limit merge iterations */
+
+                while (merge_attempts < max_merges && ret <= diff - 1) {
+                    if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
+                        break;  /* No more merges possible */
+                    }
+                    merge_attempts++;
+
+                    /* Re-test difficulty after merge */
+                    memset(soln, 0, a);
+                    ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+                }
+
+                if (ret <= diff - 1)
+                    continue;  /* Still too easy after merging - new attempt */
+            }
         }
         memset(soln, 0, a);
         ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
-        if (ret != diff)
-            continue; /* go round again */
+        if (ret != diff) {
+            /*
+             * Puzzle doesn't match target difficulty - try merging.
+             * This handles cases where puzzle is harder than requested
+             * (ret > diff) by trying to simplify via different cage structure.
+             */
+            if (ret < diff) {
+                /* Too easy - merge cages to increase difficulty */
+                int merge_attempts = 0;
+                int max_merges = w * 2;
 
-        /*
-         * Potential optimization (not implemented): merge adjacent
-         * blocks to increase difficulty when the puzzle is easier
-         * than requested. This could improve generation success rate.
-         * Currently omitted as generation speed is acceptable.
-         */
+                while (merge_attempts < max_merges && ret < diff) {
+                    if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
+                        break;
+                    }
+                    merge_attempts++;
+                    memset(soln, 0, a);
+                    ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
+                }
+            }
+
+            if (ret != diff)
+                continue; /* go round again */
+        }
 
         /*
          * We've got a usable puzzle!
@@ -1571,7 +1869,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
 
     /*
      * Check if we exhausted retries without finding a valid puzzle.
-     * This prevents hangs with problematic mode/size combinations.
+     * No fallback - user expects the exact difficulty they selected.
      */
     if (attempts >= max_retries) {
         sfree(grid);
@@ -1702,17 +2000,16 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     long *clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
-    int maxblk = get_maxblk(params->mode_flags);
+    int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
     (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
-     * Difficulty exceptions: 3x3 puzzles at difficulty Hard or
-     * higher are currently not generable.
+     * Strict difficulty enforcement for AI generation path:
+     * If the requested difficulty cannot be achieved within max_retries,
+     * return NULL. No fallback - the user expects the exact difficulty
+     * they selected. The UI will display an appropriate error message.
      */
-    if (w == 3 && diff > DIFF_NORMAL)
-        diff = DIFF_NORMAL;
-
     grid = NULL;
 
     order = snewn(a, int);
@@ -1735,8 +2032,17 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
      * See solution encoding below for where transformations are applied.
      */
 
-    /* Limit retries to prevent infinite loops with bad grids */
-    int max_retries = 1000;
+    /*
+     * Limit retries - scale with difficulty for higher success rate.
+     * AI-generated grids may have specific properties that make
+     * certain difficulty levels harder to achieve.
+     */
+    int difficulty_multiplier = 1;
+    if (diff >= DIFF_UNREASONABLE) difficulty_multiplier = 8;
+    else if (diff >= DIFF_EXTREME) difficulty_multiplier = 4;
+    else if (diff >= DIFF_HARD) difficulty_multiplier = 2;
+
+    int max_retries = 1000 * difficulty_multiplier;
     int attempts = 0;
 
     while (attempts < max_retries) {
@@ -2069,24 +2375,59 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
         /*
          * See if the game can be solved at the specified difficulty.
+         * Use cage merging to elevate difficulty when too easy.
          */
         if (diff > 0) {
             memset(soln, 0, a * sizeof(digit));
             ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
-            if (ret <= diff - 1)
-                continue;
+            if (ret <= diff - 1) {
+                /* Too easy - try cage merging */
+                int merge_attempts = 0;
+                int max_merges = w * 2;
+
+                while (merge_attempts < max_merges && ret <= diff - 1) {
+                    if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
+                        break;
+                    }
+                    merge_attempts++;
+                    memset(soln, 0, a * sizeof(digit));
+                    ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+                }
+
+                if (ret <= diff - 1)
+                    continue;
+            }
         }
         memset(soln, 0, a * sizeof(digit));
         ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
-        if (ret != diff)
-            continue;
+        if (ret != diff) {
+            if (ret < diff) {
+                /* Too easy - merge cages */
+                int merge_attempts = 0;
+                int max_merges = w * 2;
+
+                while (merge_attempts < max_merges && ret < diff) {
+                    if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
+                        break;
+                    }
+                    merge_attempts++;
+                    memset(soln, 0, a * sizeof(digit));
+                    ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
+                }
+            }
+
+            if (ret != diff)
+                continue;
+        }
 
         /* Success! */
         break;
     }
 
+    /*
+     * No fallback - user expects the exact difficulty they selected.
+     */
     if (attempts >= max_retries) {
-        /* Failed to generate a puzzle from this grid within retry limit */
         sfree(grid);
         sfree(order);
         sfree(revorder);

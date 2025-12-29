@@ -36,7 +36,7 @@ data class GameUiState(
     // Timer and game metadata
     val elapsedTimeSeconds: Long = 0,
     val timerRunning: Boolean = false,
-    val difficulty: Int = 0,  // 0=Easy, 1=Normal, 2=Hard, 3=Insane, 4=Ludicrous
+    val difficulty: Int = 0,  // 0=Easy, 1=Normal, 2=Hard, 3=Extreme, 4=Unreasonable, 5=Ludicrous, 6=Incomprehensible
     val difficultyName: String = "Easy",
     val isMlGenerated: Boolean = false,
     // Settings
@@ -55,7 +55,10 @@ data class GameUiState(
     // Hint system (Phase 4a: Tutorial Mode)
     val showHintDialog: Boolean = false,
     val currentHint: HintInfo? = null,
-    val hintsUsed: Int = 0  // Track hints for adaptive scoring
+    val hintsUsed: Int = 0,  // Track hints for adaptive scoring
+    // Error handling for generation failures
+    val showErrorDialog: Boolean = false,
+    val errorMessage: String? = null
 )
 
 /**

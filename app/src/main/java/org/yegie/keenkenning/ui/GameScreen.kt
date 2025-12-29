@@ -447,6 +447,18 @@ fun GameScreen(
                     )
                 }
 
+                // Error Dialog - shows puzzle generation failures
+                if (uiState.showErrorDialog) {
+                    ErrorDialog(
+                        message = uiState.errorMessage ?: "Puzzle generation failed",
+                        onDismiss = { viewModel.dismissErrorDialog() },
+                        onRetry = {
+                            viewModel.dismissErrorDialog()
+                            // Retry with same parameters (or user can adjust settings)
+                        }
+                    )
+                }
+
                 // Tap-to-reveal overlay when UI is hidden in immersive mode
                 if (uiState.immersiveMode && !uiState.uiVisible) {
                     Box(
@@ -617,7 +629,7 @@ private fun TopBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            // Combined badge: "6x6 Insane" or "6x6 Insane AI"
+            // Combined badge: "6x6 Extreme" or "6x6 Extreme AI"
             Surface(
                 shape = RoundedCornerShape(6.dp),
                 color = getDifficultyColor(difficultyName).copy(alpha = 0.9f)
@@ -745,11 +757,13 @@ private fun formatTime(seconds: Long): String {
 }
 
 private fun getDifficultyColor(difficulty: String): Color = when (difficulty) {
-    "Easy" -> Color(0xFF4CAF50)      // Green
-    "Normal" -> Color(0xFFFFC107)    // Amber
-    "Hard" -> Color(0xFFFF9800)      // Orange
-    "Insane" -> Color(0xFFF44336)    // Red - hard but logically solvable
-    "Ludicrous" -> Color(0xFF9C27B0) // Purple - may require guessing
+    "Easy" -> Color(0xFF4CAF50)           // Green
+    "Normal" -> Color(0xFFFFC107)         // Amber
+    "Hard" -> Color(0xFFFF9800)           // Orange
+    "Extreme" -> Color(0xFFF44336)        // Red - advanced techniques
+    "Unreasonable" -> Color(0xFF9C27B0)   // Purple - may require guessing
+    "Ludicrous" -> Color(0xFF673AB7)      // Deep Purple - extensive trial-and-error
+    "Incomprehensible" -> Color(0xFF311B92) // Indigo - maximum difficulty
     else -> Color(0xFF666666)
 }
 
@@ -1709,6 +1723,66 @@ private fun HintDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Close", color = Color(0xFFDEB887))
+            }
+        }
+    )
+}
+
+/**
+ * Error Dialog for puzzle generation failures.
+ * Shows user-friendly error message with dismiss and retry options.
+ */
+@Composable
+private fun ErrorDialog(
+    message: String,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF3a2a2a),  // Dark red theme for errors
+        titleContentColor = Color(0xFFF44336),
+        textContentColor = Color(0xFFE0E0E0),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = Color(0xFFF44336),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Generation Failed",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = message,
+                    fontSize = 14.sp,
+                    color = Color(0xFFE0E0E0),
+                    lineHeight = 20.sp
+                )
+                Text(
+                    text = "Try reducing the grid size or difficulty level.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF999999),
+                    lineHeight = 18.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRetry) {
+                Text("OK", color = Color(0xFFF44336), fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss", color = Color(0xFF999999))
             }
         }
     )
