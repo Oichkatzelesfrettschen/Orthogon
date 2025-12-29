@@ -45,7 +45,7 @@ public class KeenModel {
     {
         public enum Type
         {
-            ADD,MINUS,TIMES,DIVIDE,EXPONENT
+            ADD,MINUS,TIMES,DIVIDE,EXPONENT,MODULO,GCD,LCM,XOR
         }
 
         public Type zoneType;
@@ -77,6 +77,18 @@ public class KeenModel {
                     break;
                 case EXPONENT:
                     a+=" ^";
+                    break;
+                case MODULO:
+                    a+=" %";
+                    break;
+                case GCD:
+                    a+=" gcd";
+                    break;
+                case LCM:
+                    a+=" lcm";
+                    break;
+                case XOR:
+                    a+=" ⊕";  // XOR symbol
                     break;
             }
 

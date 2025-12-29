@@ -108,6 +108,10 @@ object PuzzleParser {
                 's' -> KeenModel.Zone.Type.MINUS
                 'd' -> KeenModel.Zone.Type.DIVIDE
                 'e' -> KeenModel.Zone.Type.EXPONENT
+                'o' -> KeenModel.Zone.Type.MODULO    // 'o' for m'o'dulo
+                'g' -> KeenModel.Zone.Type.GCD
+                'l' -> KeenModel.Zone.Type.LCM
+                'x' -> KeenModel.Zone.Type.XOR       // 'x' for XOR
                 else -> return ParseResult.Failure("Unknown operation: $opChar", semicolonIndex + 1 + pos)
             }
 

@@ -152,6 +152,18 @@ public class KeenModelBuilder {
                 case 'e':
                     zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.EXPONENT,val,i);
                     break;
+                case 'o':  // 'o' for m'o'dulo
+                    zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.MODULO,val,i);
+                    break;
+                case 'g':
+                    zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.GCD,val,i);
+                    break;
+                case 'l':
+                    zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.LCM,val,i);
+                    break;
+                case 'x':  // XOR
+                    zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.XOR,val,i);
+                    break;
                 default://divide
                     zones[i] = new KeenModel.Zone(KeenModel.Zone.Type.DIVIDE,val,i);
                     break;

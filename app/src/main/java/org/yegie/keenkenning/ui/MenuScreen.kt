@@ -442,6 +442,7 @@ fun getModeIcon(mode: GameMode): ImageVector {
         GameMode.ZERO_INCLUSIVE -> Icons.Default.Check   // Zero: included (check)
         GameMode.EXPONENT -> Icons.Default.Star          // Power: special star
         GameMode.NEGATIVE_NUMBERS -> Icons.Default.Delete    // Negative: minus-like
+        GameMode.BITWISE -> Icons.Default.Settings       // Bitwise: XOR operations
         GameMode.MODULAR -> Icons.Default.Refresh        // Modular: wrap around
         GameMode.KILLER -> Icons.Default.Warning         // Killer: constraint warning
         GameMode.HINT_MODE -> Icons.Default.Info         // Hints: info

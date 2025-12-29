@@ -653,6 +653,10 @@ class GameViewModel : ViewModel() {
         KeenModel.Zone.Type.TIMES -> "×"
         KeenModel.Zone.Type.DIVIDE -> "÷"
         KeenModel.Zone.Type.EXPONENT -> "^"
+        KeenModel.Zone.Type.MODULO -> "%"
+        KeenModel.Zone.Type.GCD -> "gcd"
+        KeenModel.Zone.Type.LCM -> "lcm"
+        KeenModel.Zone.Type.XOR -> "⊕"
     }
 
     fun dismissHint() {

@@ -82,15 +82,25 @@ static char const keen_diffchars[] = DIFFLIST(ENCODE);
  * Ordering matters: ADD/MUL before SUB/DIV ensures preference during
  * generation when multiple operations yield the same result.
  *
- * 8 operations using 3 bits (0-7):
- *   0: ADD  - Sum of all digits
- *   1: MUL  - Product of all digits
- *   2: SUB  - Absolute difference (2-cell only)
- *   3: DIV  - Integer quotient (2-cell only)
- *   4: EXP  - Exponentiation base^exp (2-cell, requires MODE_EXPONENT)
- *   5: MOD  - Modulo operation (2-cell, requires MODE_NUMBER_THEORY)
- *   6: GCD  - Greatest common divisor (requires MODE_NUMBER_THEORY)
- *   7: LCM  - Least common multiple (requires MODE_NUMBER_THEORY)
+ * 4-bit encoding (bits 28-31) with backward-compatible layout:
+ * - EVEN slots (0,2,4,6,8,10,12,14): Original 8 operations
+ * - ODD slots (1,3,5,7,...): Extended operations (bitwise, etc.)
+ *
+ * Original operations (even slots):
+ *   0x0: ADD  - Sum of all digits
+ *   0x2: MUL  - Product of all digits
+ *   0x4: SUB  - Absolute difference (2-cell only)
+ *   0x6: DIV  - Integer quotient (2-cell only)
+ *   0x8: EXP  - Exponentiation base^exp (2-cell, requires MODE_EXPONENT)
+ *   0xA: MOD  - Modulo operation (2-cell, requires MODE_NUMBER_THEORY)
+ *   0xC: GCD  - Greatest common divisor (requires MODE_NUMBER_THEORY)
+ *   0xE: LCM  - Least common multiple (requires MODE_NUMBER_THEORY)
+ *
+ * Extended operations (odd slots, requires MODE_BITWISE):
+ *   0x1: XOR  - Bitwise exclusive-or (high ambiguity for difficulty)
+ *   0x3: AND  - Bitwise and (reserved)
+ *   0x5: OR   - Bitwise or (reserved)
+ *   0x7-0xF: Reserved for future operations
  */
 #define C_ADD 0x00000000L
 #define C_MUL 0x20000000L
@@ -100,8 +110,12 @@ static char const keen_diffchars[] = DIFFLIST(ENCODE);
 #define C_MOD 0xA0000000L  /* Modulo: a % b = clue (requires MODE_NUMBER_THEORY) */
 #define C_GCD 0xC0000000L  /* GCD of all digits (requires MODE_NUMBER_THEORY) */
 #define C_LCM 0xE0000000L  /* LCM of all digits (requires MODE_NUMBER_THEORY) */
-#define CMASK 0xE0000000L  /* 3 bits for 8 operations (all slots used) */
-#define CUNIT 0x20000000L
+/* Extended bitwise operations (odd slots) */
+#define C_XOR 0x10000000L  /* XOR of all digits (requires MODE_BITWISE) */
+#define C_AND 0x30000000L  /* AND of all digits (reserved, requires MODE_BITWISE) */
+#define C_OR  0x50000000L  /* OR of all digits (reserved, requires MODE_BITWISE) */
+#define CMASK 0xF0000000L  /* 4 bits for 16 operations (backward compatible) */
+#define CUNIT 0x10000000L  /* Unit step for operation codes */
 
 /*
  * Helper functions for number theory operations.
@@ -739,6 +753,57 @@ static int solver_common(struct latin_solver *solver, void *vctx, int diff) {
                     if (lcm_array(ctx->dscratch, n) == value)
                         solver_clue_candidate(ctx, diff, box);
                     i--;
+                }
+            }
+            break;
+
+        case C_XOR:
+            /*
+             * XOR cages: XOR of all digits = clue value.
+             * Bitwise exclusive-or is associative and commutative.
+             * XOR has HIGH AMBIGUITY: many digit combinations produce same result,
+             * making it excellent for increasing puzzle difficulty.
+             *
+             * Properties:
+             *   - XOR(a) = a
+             *   - XOR(a,b) = a ^ b
+             *   - XOR(a,a) = 0  (self-inverse)
+             *   - XOR(a,0) = a  (identity)
+             */
+            i = 0;
+            ctx->dscratch[i] = 0;
+            total = 0;  /* XOR identity is 0 */
+            while (1) {
+                if (i < n) {
+                    /* Find next valid digit */
+                    for (j = ctx->dscratch[i] + 1; j <= w; j++) {
+                        if (!solver->cube[sq[i] * w + j - 1])
+                            continue;
+                        /* Check Latin square constraint */
+                        for (k = 0; k < i; k++)
+                            if (ctx->dscratch[k] == j &&
+                                (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
+                                break;
+                        if (k < i)
+                            continue;
+                        break;
+                    }
+
+                    if (j > w) {
+                        i--;
+                        if (i < 0) break;
+                        total ^= ctx->dscratch[i];  /* Undo XOR (self-inverse) */
+                    } else {
+                        ctx->dscratch[i++] = j;
+                        total ^= j;  /* Apply XOR */
+                        ctx->dscratch[i] = 0;
+                    }
+                } else {
+                    /* Check if XOR of collected digits equals value */
+                    if (total == value)
+                        solver_clue_candidate(ctx, diff, box);
+                    i--;
+                    total ^= ctx->dscratch[i];  /* Undo XOR */
                 }
             }
             break;
@@ -1475,7 +1540,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
 #define F_MOD 0x020  /* Modulo: larger % smaller */
 #define F_GCD 0x040  /* Greatest common divisor */
 #define F_LCM 0x080  /* Least common multiple */
-#define BAD_SHIFT 8  /* Increased for 8 clue types */
+#define F_XOR 0x100  /* Bitwise XOR (high ambiguity) */
+#define BAD_SHIFT 9  /* Increased for 9+ clue types */
 
         for (i = 0; i < a; i++) {
             singletons[i] = 0;
@@ -1485,6 +1551,9 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 singletons[j] = F_MUL;
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
+                /* XOR works great on N-cell cages with MODE_BITWISE */
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE))
+                    singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
                 /* Fetch the two numbers and sort them into order. */
                 int p = grid[j], q = grid[i], v;
@@ -1610,6 +1679,22 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                     else if (v <= 100)
                         singletons[j] |= F_LCM << BAD_SHIFT;
                 }
+
+                /*
+                 * XOR: p ^ q. Available when MODE_BITWISE is active.
+                 * XOR has VERY HIGH ambiguity - many pairs produce the same result.
+                 * Excellent for increasing puzzle difficulty.
+                 *
+                 * For difficulty: XOR is ALWAYS preferred at Hard+ because
+                 * it provides minimal constraint information.
+                 */
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
+                    v = p ^ q;
+                    if (diff >= DIFF_HARD)
+                        singletons[j] |= F_XOR;  /* Always good at hard+ */
+                    else
+                        singletons[j] |= F_XOR << BAD_SHIFT;  /* Too ambiguous for easy */
+                }
             }
         }
 
@@ -1623,7 +1708,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * the solver to use advanced techniques like forcing chains.
          *
          * Ambiguity ranking (high to low):
-         *   GCD (esp. GCD=1) > ADD (large cages) > LCM > MOD > SUB > MUL > DIV > EXP
+         *   XOR > GCD (esp. GCD=1) > ADD (large cages) > LCM > MOD > SUB > MUL > DIV > EXP
          *
          * Note: O(N^2) complexity is acceptable here since N is bounded
          * by the maximum number of dominoes in a 9x9 grid.
@@ -1635,16 +1720,17 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         /*
          * Operation order arrays: different priorities for different difficulties.
          * Easy/Normal: Prefer constraining ops (DIV, EXP) for simpler puzzles.
-         * Hard+: Prefer ambiguous ops (GCD, ADD, LCM) for harder puzzles.
+         * Hard+: Prefer ambiguous ops (XOR, GCD, ADD, LCM) for harder puzzles.
+         * Index mapping: 0=DIV, 1=SUB, 2=MUL, 3=ADD, 4=EXP, 5=MOD, 6=GCD, 7=LCM, 8=XOR
          */
-        static const int op_order_easy[8] = {0, 1, 2, 3, 4, 5, 6, 7};  /* DIV,SUB,MUL,ADD,EXP,MOD,GCD,LCM */
-        static const int op_order_hard[8] = {6, 3, 7, 5, 1, 2, 0, 4};  /* GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
+        static const int op_order_easy[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};  /* DIV...LCM,XOR (XOR last) */
+        static const int op_order_hard[9] = {8, 6, 3, 7, 5, 1, 2, 0, 4};  /* XOR,GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
         const int *op_order = (diff >= DIFF_HARD) ? op_order_hard : op_order_easy;
 
         while (1) {
             int done_something = FALSE;
 
-            for (int op_idx = 0; op_idx < 8; op_idx++) {
+            for (int op_idx = 0; op_idx < 9; op_idx++) {
                 long clue;
                 int good, bad;
                 k = op_order[op_idx];  /* Use difficulty-aware ordering */
@@ -1680,6 +1766,10 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 case 7:
                     clue = C_LCM;
                     good = F_LCM;
+                    break;
+                case 8:
+                    clue = C_XOR;
+                    good = F_XOR;
                     break;
                 default:
                     continue;  /* Safety fallback */
@@ -1720,6 +1810,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
 #undef F_MOD
 #undef F_GCD
 #undef F_LCM
+#undef F_XOR
 #undef BAD_SHIFT
 
         /*
@@ -1776,6 +1867,10 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 case C_LCM:
                     /* LCM: accumulate lcm(current, next) */
                     cluevals[j] = lcm_helper(cluevals[j], grid[i]);
+                    break;
+                case C_XOR:
+                    /* XOR: accumulate xor(current, next) - self-inverse */
+                    cluevals[j] ^= grid[i];
                     break;
                 }
             }
@@ -1926,6 +2021,9 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 break;
             case C_LCM:
                 *p++ = 'l';
+                break;
+            case C_XOR:
+                *p++ = 'x';  /* XOR: x ⊕ y notation */
                 break;
             }
             p += sprintf(p, "%05ld", clues[j] & ~CMASK);
@@ -2143,7 +2241,8 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 #define F_MOD 0x020  /* Modulo: larger % smaller */
 #define F_GCD 0x040  /* Greatest common divisor */
 #define F_LCM 0x080  /* Least common multiple */
-#define BAD_SHIFT 8  /* Increased for 8 clue types */
+#define F_XOR 0x100  /* Bitwise XOR (high ambiguity) */
+#define BAD_SHIFT 9  /* Increased for 9+ clue types */
 
         for (i = 0; i < a; i++) {
             singletons[i] = 0;
@@ -2153,6 +2252,9 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 singletons[j] = F_MUL;
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
+                /* XOR works great on N-cell cages with MODE_BITWISE */
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE))
+                    singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
                 int p = grid[j], q = grid[i], v;
                 if (p < q) {
@@ -2218,6 +2320,15 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                     if (v > 0 && v <= 100)  /* LCM can grow large */
                         singletons[j] |= F_LCM;
                 }
+
+                /* XOR: available when MODE_BITWISE is active */
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
+                    v = p ^ q;
+                    if (diff >= DIFF_HARD)
+                        singletons[j] |= F_XOR;  /* Always good at hard+ */
+                    else
+                        singletons[j] |= F_XOR << BAD_SHIFT;  /* Too ambiguous for easy */
+                }
             }
         }
 
@@ -2228,7 +2339,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
         while (1) {
             int done_something = FALSE;
 
-            for (k = 0; k < 8; k++) {
+            for (k = 0; k < 9; k++) {
                 long clue;
                 int good, bad;
                 switch (k) {
@@ -2263,6 +2374,10 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 case 7:
                     clue = C_LCM;
                     good = F_LCM;
+                    break;
+                case 8:
+                    clue = C_XOR;
+                    good = F_XOR;
                     break;
                 default:
                     continue;  /* Safety fallback */
@@ -2302,6 +2417,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 #undef F_MOD
 #undef F_GCD
 #undef F_LCM
+#undef F_XOR
 #undef BAD_SHIFT
 
         /* Calculate clue values */
@@ -2356,6 +2472,10 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 case C_LCM:
                     /* LCM: accumulate lcm(current, next) */
                     cluevals[j] = lcm_helper(cluevals[j], grid[i]);
+                    break;
+                case C_XOR:
+                    /* XOR: accumulate xor(current, next) - self-inverse */
+                    cluevals[j] ^= grid[i];
                     break;
                 }
             }
@@ -2479,6 +2599,9 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 break;
             case C_LCM:
                 *p++ = 'l';
+                break;
+            case C_XOR:
+                *p++ = 'x';  /* XOR: x ⊕ y notation */
                 break;
             }
             p += sprintf(p, "%05ld", clues[j] & ~CMASK);

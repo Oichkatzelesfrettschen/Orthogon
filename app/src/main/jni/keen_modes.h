@@ -33,6 +33,7 @@
 /* Phase 2: Extended operations (medium effort) */
 #define MODE_EXPONENT          0x0010  /* Include ^ exponent operation */
 #define MODE_NEGATIVE          0x0008  /* Range -N to +N (excluding 0) */
+#define MODE_BITWISE           0x0800  /* Enable XOR, AND, OR operations (high ambiguity) */
 
 /* Phase 3: Advanced constraints (high effort) */
 #define MODE_MODULAR           0x0020  /* Wrap-around arithmetic (mod N) */

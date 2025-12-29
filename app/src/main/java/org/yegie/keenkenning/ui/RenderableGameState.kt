@@ -147,6 +147,10 @@ enum class ZoneOperation {
     MULTIPLY,
     DIVIDE,
     EXPONENT,
+    MODULO,
+    GCD,
+    LCM,
+    XOR,
     SINGLE  // Single-cell zones (no operation)
 }
 
@@ -237,6 +241,10 @@ object GameStateTransformer {
             KeenModel.Zone.Type.TIMES -> ZoneOperation.MULTIPLY
             KeenModel.Zone.Type.DIVIDE -> ZoneOperation.DIVIDE
             KeenModel.Zone.Type.EXPONENT -> ZoneOperation.EXPONENT
+            KeenModel.Zone.Type.MODULO -> ZoneOperation.MODULO
+            KeenModel.Zone.Type.GCD -> ZoneOperation.GCD
+            KeenModel.Zone.Type.LCM -> ZoneOperation.LCM
+            KeenModel.Zone.Type.XOR -> ZoneOperation.XOR
         }
     }
 
@@ -256,6 +264,10 @@ object GameStateTransformer {
             ZoneOperation.MULTIPLY -> "×"
             ZoneOperation.DIVIDE -> "÷"
             ZoneOperation.EXPONENT -> "^"
+            ZoneOperation.MODULO -> "%"
+            ZoneOperation.GCD -> "gcd"
+            ZoneOperation.LCM -> "lcm"
+            ZoneOperation.XOR -> "⊕"
             ZoneOperation.SINGLE -> ""
         }
 

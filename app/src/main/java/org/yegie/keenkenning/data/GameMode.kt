@@ -83,6 +83,18 @@ enum class GameMode(
         phase = 2,
         implemented = true
     ),
+    BITWISE(
+        displayName = "Bitwise",
+        description = "XOR operations (high ambiguity)",
+        iconName = "memory",
+        cFlags = 0x800,  // MODE_BITWISE from keen_modes.h
+        phase = 2,
+        implemented = true,
+        extendedTip = "Introduces XOR (exclusive-or) operations. " +
+            "XOR has very high ambiguity: many digit combinations produce the same result. " +
+            "Tip: XOR is self-inverse (a ⊕ a = 0) and the identity is 0. " +
+            "Best for Hard+ difficulties where ambiguity adds challenge."
+    ),
 
     // Phase 3: Advanced Constraints (High Effort)
     MODULAR(
