@@ -120,12 +120,12 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     long lseed = seed;
     struct random_state* rs = random_new((char*)&lseed, sizeof(long));
 
-    char* aux = NULL;
+    char* aux = nullptr;
     int interactive = 0;
 
     char* level = new_game_desc(&params, rs, &aux, interactive);
 
-    if (level == NULL) {
+    if (level == nullptr) {
         random_free(rs);
         char* err = jni_make_error(JNI_ERR_GENERATION_FAIL, "Native generation returned null");
         jstring retval = (*env)->NewStringUTF(env, err);
@@ -135,7 +135,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 
     /* Combine level and aux into payload */
     char* combined = snewn((strlen(level) + strlen(aux) + 2), char);
-    if (combined == NULL) {
+    if (combined == nullptr) {
         random_free(rs);
         sfree(level);
         sfree(aux);
@@ -215,7 +215,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     }
 
     jint* body = (*env)->GetIntArrayElements(env, gridFlat, 0);
-    if (body == NULL) {
+    if (body == nullptr) {
         random_free(rs);
         char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to access grid array");
         jstring retval = (*env)->NewStringUTF(env, err);
@@ -224,7 +224,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     }
 
     digit* input_grid = snewn((size_t)len, digit);
-    if (input_grid == NULL) {
+    if (input_grid == nullptr) {
         (*env)->ReleaseIntArrayElements(env, gridFlat, body, 0);
         random_free(rs);
         char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate input grid");
@@ -238,13 +238,13 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     }
     (*env)->ReleaseIntArrayElements(env, gridFlat, body, 0);
 
-    char* aux = NULL;
+    char* aux = nullptr;
     int interactive = 0;
 
     /* Try to generate a game description from the provided grid */
     char* level = new_game_desc_from_grid(&params, rs, input_grid, &aux, interactive);
 
-    if (level == NULL) {
+    if (level == nullptr) {
         sfree(input_grid);
         random_free(rs);
         char* err = jni_make_error(JNI_ERR_INVALID_GRID,
@@ -256,7 +256,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 
     /* Combine level and aux into payload */
     char* combined = snewn((strlen(level) + strlen(aux) + 2), char);
-    if (combined == NULL) {
+    if (combined == nullptr) {
         sfree(input_grid);
         random_free(rs);
         sfree(level);
@@ -359,7 +359,7 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenValidator_validateGri
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
         if (dsf_body) (*env)->ReleaseIntArrayElements(env, dsfFlat, dsf_body, 0);
         if (clues_body) (*env)->ReleaseLongArrayElements(env, cluesFlat, clues_body, 0);
-        return NULL;
+        return nullptr;
     }
 
     /* Convert to native types */
@@ -486,20 +486,20 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
     jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
     jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
     jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
-    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
+    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : nullptr;
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
         if (dsf_body) (*env)->ReleaseIntArrayElements(env, dsfFlat, dsf_body, 0);
         if (clues_body) (*env)->ReleaseLongArrayElements(env, cluesFlat, clues_body, 0);
         if (solution_body) (*env)->ReleaseIntArrayElements(env, solutionFlat, solution_body, 0);
-        return NULL;
+        return nullptr;
     }
 
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
     long* clues = snewn((size_t)n, long);
-    digit* solution = solutionFlat ? snewn((size_t)n, digit) : NULL;
+    digit* solution = solutionFlat ? snewn((size_t)n, digit) : nullptr;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -522,7 +522,7 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
     ctx.solution = solution;
 
     hint_result result;
-    jintArray ret = NULL;
+    jintArray ret = nullptr;
 
     if (kenken_get_hint(&ctx, &result)) {
         ret = (*env)->NewIntArray(env, 7);
@@ -554,20 +554,20 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
     jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
     jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
     jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
-    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
+    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : nullptr;
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
         if (dsf_body) (*env)->ReleaseIntArrayElements(env, dsfFlat, dsf_body, 0);
         if (clues_body) (*env)->ReleaseLongArrayElements(env, cluesFlat, clues_body, 0);
         if (solution_body) (*env)->ReleaseIntArrayElements(env, solutionFlat, solution_body, 0);
-        return NULL;
+        return nullptr;
     }
 
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
     long* clues = snewn((size_t)n, long);
-    digit* solution = solutionFlat ? snewn((size_t)n, digit) : NULL;
+    digit* solution = solutionFlat ? snewn((size_t)n, digit) : nullptr;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -590,7 +590,7 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
     ctx.solution = solution;
 
     hint_result result;
-    jintArray ret = NULL;
+    jintArray ret = nullptr;
 
     if (kenken_explain_cell(&ctx, cell, &result)) {
         ret = (*env)->NewIntArray(env, 7);

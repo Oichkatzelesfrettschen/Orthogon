@@ -69,7 +69,7 @@ static dlx_node* choose_column(dlx_ctx* ctx) {
     int min_size;
 
     best = ctx->header->R;
-    if (best == ctx->header) return NULL; /* Empty matrix */
+    if (best == ctx->header) return nullptr; /* Empty matrix */
 
     min_size = best->size;
     for (c = best->R; c != ctx->header; c = c->R) {
@@ -148,10 +148,10 @@ dlx_ctx* dlx_new(int n_rows, int n_cols, int** matrix) {
     int* row_first; /* First node in each row */
     int* row_last;  /* Last node in each row */
 
-    if (n_rows <= 0 || n_cols <= 0 || !matrix) return NULL;
+    if (n_rows <= 0 || n_cols <= 0 || !matrix) return nullptr;
 
     ctx = (dlx_ctx*)calloc(1, sizeof(dlx_ctx));
-    if (!ctx) return NULL;
+    if (!ctx) return nullptr;
 
     ctx->n_cols = n_cols;
 
@@ -170,7 +170,7 @@ dlx_ctx* dlx_new(int n_rows, int n_cols, int** matrix) {
 
     if (!ctx->header || !ctx->columns || !ctx->nodes) {
         dlx_destroy(ctx);
-        return NULL;
+        return nullptr;
     }
 
     ctx->n_nodes = node_count;
@@ -204,7 +204,7 @@ dlx_ctx* dlx_new(int n_rows, int n_cols, int** matrix) {
         free(row_first);
         free(row_last);
         dlx_destroy(ctx);
-        return NULL;
+        return nullptr;
     }
     for (i = 0; i < n_rows; i++) {
         row_first[i] = -1;
@@ -243,7 +243,7 @@ dlx_ctx* dlx_new(int n_rows, int n_cols, int** matrix) {
     /* Link nodes horizontally within rows */
     for (i = 0; i < n_rows; i++) {
         if (row_first[i] >= 0) {
-            dlx_node *first = NULL, *prev = NULL;
+            dlx_node *first = nullptr, *prev = nullptr;
             for (j = 0; j < node_count; j++) {
                 dlx_node* node = &ctx->nodes[j];
                 if (node->row == i) {
@@ -272,7 +272,7 @@ dlx_ctx* dlx_new(int n_rows, int n_cols, int** matrix) {
     ctx->solution = (int*)malloc((size_t)ctx->sol_cap * sizeof(int));
     if (!ctx->solution) {
         dlx_destroy(ctx);
-        return NULL;
+        return nullptr;
     }
     ctx->sol_size = 0;
     ctx->found = 0;
@@ -308,7 +308,7 @@ int dlx_solve(dlx_ctx* ctx) {
 int* dlx_get_solution(dlx_ctx* ctx, int* size) {
     if (!ctx || !ctx->found) {
         if (size) *size = 0;
-        return NULL;
+        return nullptr;
     }
     if (size) *size = ctx->sol_size;
     return ctx->solution;

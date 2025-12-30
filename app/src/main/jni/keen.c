@@ -1168,7 +1168,7 @@ static int solver(int w, int* dsf, long* clues, digit* soln, int maxdiff, int mo
 
 /*
  * Find and merge one pair of adjacent cages to increase difficulty.
- * Returns TRUE if a merge was performed, FALSE if no valid merge exists.
+ * Returns true if a merge was performed, false if no valid merge exists.
  *
  * Parameters:
  *   w        - grid width
@@ -1327,7 +1327,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
 
     /*
      * If the requested difficulty cannot be achieved within max_retries,
-     * return NULL. No fallback - the user expects the exact difficulty
+     * return nullptr. No fallback - the user expects the exact difficulty
      * they selected. The UI will display an appropriate error message.
      */
     grid = nullptr;
@@ -2028,10 +2028,10 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
     /*
      * Strict difficulty enforcement for AI generation path:
      * If the requested difficulty cannot be achieved within max_retries,
-     * return NULL. No fallback - the user expects the exact difficulty
+     * return nullptr. No fallback - the user expects the exact difficulty
      * they selected. The UI will display an appropriate error message.
      */
-    grid = NULL;
+    grid = nullptr;
 
     order = snewn(a, int);
     revorder = snewn(a, int);
@@ -2465,7 +2465,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
         sfree(clues);
         sfree(cluevals);
         sfree(soln);
-        return NULL;
+        return nullptr;
     }
 
     /* Encode description */
