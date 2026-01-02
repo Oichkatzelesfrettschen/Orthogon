@@ -1,0 +1,33 @@
+# Rocq/Coq compiled files
+*.vo
+*.vok
+*.vos
+*.glob
+*.aux
+.*.aux
+
+# Lia/Nia caches
+.lia.cache
+.nia.cache
+
+# OCaml build artifacts
+_build/
+*.cmo
+*.cmi
+*.cmx
+*.cma
+*.cmxa
+*.o
+*.a
+*.byte
+*.native
+
+# Core dumps
+core.*
+
+# Malfunction artifacts
+*.mlf
+
+# Editor backups
+*~
+\#*\#

@@ -1,0 +1,516 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<link href="coqdoc.css" rel="stylesheet" type="text/css" />
+<title>KeenKenning.LatinEnum</title>
+</head>
+
+<body>
+
+<div id="page">
+
+<div id="header">
+</div>
+
+<div id="main">
+
+<h1 class="libtitle">Library KeenKenning.LatinEnum</h1>
+
+<div class="code">
+</div>
+
+<div class="doc">
+<a id="lab1"></a><h1 class="section">LatinEnum.v: Formal enumeration of Latin squares and difficulty bounds</h1>
+
+ *
+<a id="lab2"></a><h1 class="section">This module formally specifies:</h1>
+
+<a id="lab3"></a><h1 class="section">- Latin square definitions and properties</h1>
+
+<a id="lab4"></a><h1 class="section">- Enumeration bounds (OEIS A002860: 1, 1, 12, 576, 161280, ...)</h1>
+
+<a id="lab5"></a><h1 class="section">- Reduced Latin square counts (OEIS A000315)</h1>
+
+<a id="lab6"></a><h1 class="section">- Cage partition bounds for KenKen difficulty</h1>
+
+<a id="lab7"></a><h1 class="section">- Mathematical justification for 3x3 HARD+ mode upgrades</h1>
+
+ *
+<a id="lab8"></a><h1 class="section">References:</h1>
+
+<a id="lab9"></a><h1 class="section">- OEIS A002860: Number of Latin squares of order n</h1>
+
+<a id="lab10"></a><h1 class="section">- OEIS A000315: Number of reduced Latin squares of order n</h1>
+
+<a id="lab11"></a><h1 class="section">- https://en.wikipedia.org/wiki/Latin_square</h1>
+
+ *
+<a id="lab12"></a><h1 class="section">SPDX-License-Identifier: MIT</h1>
+
+<a id="lab13"></a><h1 class="section">SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors</h1>
+
+ 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">Arith</span> <span class="id" title="library">Bool</span> <span class="id" title="library">List</span> <span class="id" title="library">Lia</span> <span class="id" title="library">Nat</span> <span class="id" title="library">ZArith</span>.<br/>
+<span class="id" title="keyword">Import</span> <span class="id" title="module">ListNotations</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Factorial function 
+</div>
+<div class="code">
+<span class="id" title="keyword">Fixpoint</span> <a id="fact" class="idref" href="#fact"><span class="id" title="definition">fact</span></a> (<a id="n:1" class="idref" href="#n:1"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:1"><span class="id" title="variable">n</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; 1<br/>
+&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">m</span> =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#n:1"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#ea2ff3d561159081cea6fb2e8113cc54"><span class="id" title="notation">*</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#fact:2"><span class="id" title="definition">fact</span></a> <span class="id" title="var">m</span><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab14"></a><h1 class="section">Latin Square Definitions</h1>
+
+<div class="paragraph"> </div>
+
+ A Latin square of order n is an n×n matrix where each row and column
+    contains each element of {1, ..., n} exactly once. 
+<div class="paragraph"> </div>
+
+ Row validity: each element appears exactly once in the row 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="row_valid" class="idref" href="#row_valid"><span class="id" title="definition">row_valid</span></a> (<a id="n:4" class="idref" href="#n:4"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="row:5" class="idref" href="#row:5"><span class="id" title="binder">row</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <span class="id" title="keyword">Prop</span> :=<br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#length"><span class="id" title="definition">length</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#row:5"><span class="id" title="variable">row</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:4"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">forall</span> <a id="x:6" class="idref" href="#x:6"><span class="id" title="binder">x</span></a>, <a class="idref" href="KeenKenning.LatinEnum.html#x:6"><span class="id" title="variable">x</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 1 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#x:6"><span class="id" title="variable">x</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#cb53cf0ee22c036a03b4a9281c68b5a3"><span class="id" title="notation">&lt;=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:4"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <span class="id" title="definition">In</span> <a class="idref" href="KeenKenning.LatinEnum.html#x:6"><span class="id" title="variable">x</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#row:5"><span class="id" title="variable">row</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="inductive">NoDup</span> <a class="idref" href="KeenKenning.LatinEnum.html#row:5"><span class="id" title="variable">row</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Column extraction from a matrix 
+</div>
+<div class="code">
+<span class="id" title="keyword">Fixpoint</span> <a id="get_column" class="idref" href="#get_column"><span class="id" title="definition">get_column</span></a> (<a id="col_idx:7" class="idref" href="#col_idx:7"><span class="id" title="binder">col_idx</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="matrix:8" class="idref" href="#matrix:8"><span class="id" title="binder">matrix</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>)) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#matrix:8"><span class="id" title="variable">matrix</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <span class="id" title="notation">[]</span> =&gt; <span class="id" title="notation">[]</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">row</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#::list_scope:x_'::'_x"><span class="id" title="notation">::</span></a> <span class="id" title="var">rest</span> =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">match</span> <span class="id" title="definition">nth_error</span> <span class="id" title="var">row</span> <a class="idref" href="KeenKenning.LatinEnum.html#col_idx:7"><span class="id" title="variable">col_idx</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <span class="id" title="var">v</span> =&gt; <span class="id" title="var">v</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#::list_scope:x_'::'_x"><span class="id" title="notation">::</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#get_column:9"><span class="id" title="definition">get_column</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#col_idx:7"><span class="id" title="variable">col_idx</span></a> <span class="id" title="var">rest</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#None"><span class="id" title="constructor">None</span></a> =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#get_column:9"><span class="id" title="definition">get_column</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#col_idx:7"><span class="id" title="variable">col_idx</span></a> <span class="id" title="var">rest</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">end</span><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Latin square predicate 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="is_latin_square" class="idref" href="#is_latin_square"><span class="id" title="definition">is_latin_square</span></a> (<a id="n:11" class="idref" href="#n:11"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="matrix:12" class="idref" href="#matrix:12"><span class="id" title="binder">matrix</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>)) : <span class="id" title="keyword">Prop</span> :=<br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#length"><span class="id" title="definition">length</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#matrix:12"><span class="id" title="variable">matrix</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:11"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">(</span></a><span class="id" title="keyword">forall</span> <a id="row:13" class="idref" href="#row:13"><span class="id" title="binder">row</span></a>, <span class="id" title="definition">In</span> <a class="idref" href="KeenKenning.LatinEnum.html#row:13"><span class="id" title="variable">row</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#matrix:12"><span class="id" title="variable">matrix</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#row_valid"><span class="id" title="definition">row_valid</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:11"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#row:13"><span class="id" title="variable">row</span></a><a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">)</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">(</span></a><span class="id" title="keyword">forall</span> <a id="col_idx:14" class="idref" href="#col_idx:14"><span class="id" title="binder">col_idx</span></a>, <a class="idref" href="KeenKenning.LatinEnum.html#col_idx:14"><span class="id" title="variable">col_idx</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#::nat_scope:x_'&lt;'_x"><span class="id" title="notation">&lt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:11"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#row_valid"><span class="id" title="definition">row_valid</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:11"><span class="id" title="variable">n</span></a> (<a class="idref" href="KeenKenning.LatinEnum.html#get_column"><span class="id" title="definition">get_column</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#col_idx:14"><span class="id" title="variable">col_idx</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#matrix:12"><span class="id" title="variable">matrix</span></a>)<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">)</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab15"></a><h1 class="section">OEIS A002860: Total Latin squares of order n</h1>
+
+<div class="paragraph"> </div>
+
+ Known values: L(1)=1, L(2)=2, L(3)=12, L(4)=576, L(5)=161280 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="latin_count" class="idref" href="#latin_count"><span class="id" title="definition">latin_count</span></a> (<a id="n:15" class="idref" href="#n:15"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:15"><span class="id" title="variable">n</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; 0<br/>
+&nbsp;&nbsp;| 1 =&gt; 1<br/>
+&nbsp;&nbsp;| 2 =&gt; 2<br/>
+&nbsp;&nbsp;| 3 =&gt; 12<br/>
+&nbsp;&nbsp;| 4 =&gt; 576<br/>
+&nbsp;&nbsp;| 5 =&gt; 161280<br/>
+&nbsp;&nbsp;| 6 =&gt; 812851200<br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; 0  <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab16"></a><h1 class="section">OEIS A000315: Reduced Latin squares of order n</h1>
+
+<div class="paragraph"> </div>
+
+ A reduced (normalized) Latin square has first row and column in order 1..n 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="reduced_count" class="idref" href="#reduced_count"><span class="id" title="definition">reduced_count</span></a> (<a id="n:17" class="idref" href="#n:17"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:17"><span class="id" title="variable">n</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; 0<br/>
+&nbsp;&nbsp;| 1 =&gt; 1<br/>
+&nbsp;&nbsp;| 2 =&gt; 1<br/>
+&nbsp;&nbsp;| 3 =&gt; 1<br/>
+&nbsp;&nbsp;| 4 =&gt; 4<br/>
+&nbsp;&nbsp;| 5 =&gt; 56<br/>
+&nbsp;&nbsp;| 6 =&gt; 9408<br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; 0<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Relationship: L(n) = n! * (n-1)! * R(n) 
+<div class="paragraph"> </div>
+
+ Verification theorem for the relationship 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="latin_reduced_relationship" class="idref" href="#latin_reduced_relationship"><span class="id" title="lemma">latin_reduced_relationship</span></a> : <span class="id" title="keyword">forall</span> <a id="n:19" class="idref" href="#n:19"><span class="id" title="binder">n</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 1 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#cb53cf0ee22c036a03b4a9281c68b5a3"><span class="id" title="notation">&lt;=</span></a> 5 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#latin_count"><span class="id" title="definition">latin_count</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#fact"><span class="id" title="definition">fact</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#ea2ff3d561159081cea6fb2e8113cc54"><span class="id" title="notation">*</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#fact"><span class="id" title="definition">fact</span></a> (<a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#::nat_scope:x_'-'_x"><span class="id" title="notation">-</span></a> 1) <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#ea2ff3d561159081cea6fb2e8113cc54"><span class="id" title="notation">*</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#reduced_count"><span class="id" title="definition">reduced_count</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:19"><span class="id" title="variable">n</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">n</span> <span class="id" title="var">H1</span> <span class="id" title="var">H5</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">destruct</span> <span class="id" title="var">n</span> <span class="id" title="keyword">as</span> [|[|[|[|[|[|<span class="id" title="var">n'</span>]]]]]]; <span class="id" title="tactic">simpl</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="var">lia</span>. &nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="var">lia</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab17"></a><h1 class="section">Key Theorem: 3x3 Latin Square Enumeration</h1>
+
+<div class="paragraph"> </div>
+
+ There are exactly 12 Latin squares of order 3 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="latin_3x3_count" class="idref" href="#latin_3x3_count"><span class="id" title="lemma">latin_3x3_count</span></a> : <a class="idref" href="KeenKenning.LatinEnum.html#latin_count"><span class="id" title="definition">latin_count</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 12.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+There is exactly 1 reduced Latin square of order 3 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="reduced_3x3_count" class="idref" href="#reduced_3x3_count"><span class="id" title="lemma">reduced_3x3_count</span></a> : <a class="idref" href="KeenKenning.LatinEnum.html#reduced_count"><span class="id" title="definition">reduced_count</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 1.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+The unique reduced 3x3 Latin square (Cayley table of Z/3Z) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="canonical_3x3" class="idref" href="#canonical_3x3"><span class="id" title="definition">canonical_3x3</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) :=<br/>
+&nbsp;&nbsp;<span class="id" title="notation">[[</span>1<span class="id" title="notation">;</span> 2<span class="id" title="notation">;</span> 3<span class="id" title="notation">];</span><br/>
+&nbsp;&nbsp;&nbsp;<span class="id" title="notation">[</span>2<span class="id" title="notation">;</span> 3<span class="id" title="notation">;</span> 1<span class="id" title="notation">];</span><br/>
+&nbsp;&nbsp;&nbsp;<span class="id" title="notation">[</span>3<span class="id" title="notation">;</span> 1<span class="id" title="notation">;</span> 2<span class="id" title="notation">]]</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab18"></a><h1 class="section">Cage Partition Analysis</h1>
+
+<div class="paragraph"> </div>
+
+ A cage is a connected region of cells with a target value and operation 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="cage" class="idref" href="#cage"><span class="id" title="definition">cage</span></a> := (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#11c698c8685bb8ab1cf725545c085ac4"><span class="id" title="notation">*</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#11c698c8685bb8ab1cf725545c085ac4"><span class="id" title="notation">*</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#11c698c8685bb8ab1cf725545c085ac4"><span class="id" title="notation">*</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>)%<span class="id" title="keyword">type</span>. 
+<br/>
+</div>
+
+<div class="doc">
+Stirling numbers of second kind: number of ways to partition n cells into k cages  S(n,k) = k*S(n-1,k) + S(n-1,k-1) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Fixpoint</span> <a id="stirling2" class="idref" href="#stirling2"><span class="id" title="definition">stirling2</span></a> (<a id="n:20" class="idref" href="#n:20"><span class="id" title="binder">n</span></a> <a id="k:21" class="idref" href="#k:21"><span class="id" title="binder">k</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:20"><span class="id" title="variable">n</span></a>, <a class="idref" href="KeenKenning.LatinEnum.html#k:21"><span class="id" title="variable">k</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0, 0 =&gt; 1<br/>
+&nbsp;&nbsp;| 0, <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">_</span> =&gt; 0<br/>
+&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">_</span>, 0 =&gt; 0<br/>
+&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">n'</span>, <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">k'</span> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">k'</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#ea2ff3d561159081cea6fb2e8113cc54"><span class="id" title="notation">*</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#stirling2:22"><span class="id" title="definition">stirling2</span></a> <span class="id" title="var">n'</span> (<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">k'</span>) <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#stirling2:22"><span class="id" title="definition">stirling2</span></a> <span class="id" title="var">n'</span> <span class="id" title="var">k'</span><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Helper: sum of Stirling numbers S(n,0) + S(n,1) + ... + S(n,k) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Fixpoint</span> <a id="sum_stirling" class="idref" href="#sum_stirling"><span class="id" title="definition">sum_stirling</span></a> (<a id="n:25" class="idref" href="#n:25"><span class="id" title="binder">n</span></a> <a id="k:26" class="idref" href="#k:26"><span class="id" title="binder">k</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#k:26"><span class="id" title="variable">k</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#stirling2"><span class="id" title="definition">stirling2</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:25"><span class="id" title="variable">n</span></a> 0<br/>
+&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">k'</span> =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#stirling2"><span class="id" title="definition">stirling2</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:25"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#k:26"><span class="id" title="variable">k</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#sum_stirling:27"><span class="id" title="definition">sum_stirling</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:25"><span class="id" title="variable">n</span></a> <span class="id" title="var">k'</span><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Bell numbers: total ways to partition n cells 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="bell" class="idref" href="#bell"><span class="id" title="definition">bell</span></a> (<a id="n:29" class="idref" href="#n:29"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:29"><span class="id" title="variable">n</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; 1<br/>
+&nbsp;&nbsp;| <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#S"><span class="id" title="constructor">S</span></a> <span class="id" title="var">_</span> =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#sum_stirling"><span class="id" title="definition">sum_stirling</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:29"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:29"><span class="id" title="variable">n</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+For a 3x3 grid (9 cells), Bell(9) = 21147 possible partitions  But most are not valid KenKen partitions (connectivity constraint) 
+<div class="paragraph"> </div>
+
+<a id="lab19"></a><h1 class="section">Difficulty Bounds</h1>
+
+<div class="paragraph"> </div>
+
+ Difficulty is bounded by:
+    1. Number of possible Latin squares (solution space)
+    2. Number of valid cage partitions
+    3. Ambiguity of operations per cage
+
+<div class="paragraph"> </div>
+
+ Solution space size for order n 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="solution_space" class="idref" href="#solution_space"><span class="id" title="definition">solution_space</span></a> (<a id="n:31" class="idref" href="#n:31"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> := <a class="idref" href="KeenKenning.LatinEnum.html#latin_count"><span class="id" title="definition">latin_count</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:31"><span class="id" title="variable">n</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+For 3x3, solution space is only 12 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="small_3x3_solution_space" class="idref" href="#small_3x3_solution_space"><span class="id" title="lemma">small_3x3_solution_space</span></a> : <a class="idref" href="KeenKenning.LatinEnum.html#solution_space"><span class="id" title="definition">solution_space</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 12.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab20"></a><h1 class="section">Mathematical Justification for 3x3 HARD+ Mode Upgrades</h1>
+
+<div class="paragraph"> </div>
+
+ With only 12 possible solutions, difficulty must come from:
+    1. Cage ambiguity (multiple ways to satisfy a clue)
+    2. Operation complexity (BITWISE, MODULAR add ambiguity)
+    3. Constraint density (KILLER reduces valid solutions)
+
+<div class="paragraph"> </div>
+
+ Maximum cage ambiguity for standard operations on small cages  For a 2-cell cage with target T and operation +: ambiguity &lt;= n-1 pairs  For BITWISE XOR: higher ambiguity (a XOR b = c has multiple solutions) 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="max_ambiguity_standard" class="idref" href="#max_ambiguity_standard"><span class="id" title="definition">max_ambiguity_standard</span></a> (<a id="n:32" class="idref" href="#n:32"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="cage_size:33" class="idref" href="#cage_size:33"><span class="id" title="binder">cage_size</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:33"><span class="id" title="variable">cage_size</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 1 =&gt; 1  <br/>
+&nbsp;&nbsp;| 2 =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#n:32"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#::nat_scope:x_'-'_x"><span class="id" title="notation">-</span></a> 1  <br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#fact"><span class="id" title="definition">fact</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:33"><span class="id" title="variable">cage_size</span></a>  <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="max_ambiguity_bitwise" class="idref" href="#max_ambiguity_bitwise"><span class="id" title="definition">max_ambiguity_bitwise</span></a> (<a id="n:35" class="idref" href="#n:35"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="cage_size:36" class="idref" href="#cage_size:36"><span class="id" title="binder">cage_size</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:36"><span class="id" title="variable">cage_size</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 1 =&gt; 1<br/>
+&nbsp;&nbsp;| 2 =&gt; <a class="idref" href="KeenKenning.LatinEnum.html#n:35"><span class="id" title="variable">n</span></a>  <br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; <span class="id" title="definition">Nat.pow</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:35"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:36"><span class="id" title="variable">cage_size</span></a>  <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Theorem: BITWISE increases ambiguity for 2-cell cages  This is the most common and important case in KenKen puzzles 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="bitwise_increases_ambiguity_2cell" class="idref" href="#bitwise_increases_ambiguity_2cell"><span class="id" title="lemma">bitwise_increases_ambiguity_2cell</span></a> : <span class="id" title="keyword">forall</span> <a id="n:38" class="idref" href="#n:38"><span class="id" title="binder">n</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#n:38"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#max_ambiguity_bitwise"><span class="id" title="definition">max_ambiguity_bitwise</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:38"><span class="id" title="variable">n</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#max_ambiguity_standard"><span class="id" title="definition">max_ambiguity_standard</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:38"><span class="id" title="variable">n</span></a> 2.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">n</span> <span class="id" title="var">Hn</span>. <span class="id" title="tactic">simpl</span>. <span class="id" title="var">lia</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+For larger cages, bitwise ambiguity grows exponentially  n^k &gt;= k! holds for n &gt;= 2 when k is small (k &lt;= 3 for n=2) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Lemma</span> <a id="pow_ge_fact_3" class="idref" href="#pow_ge_fact_3"><span class="id" title="lemma">pow_ge_fact_3</span></a> : <span class="id" title="definition">Nat.pow</span> 2 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#fact"><span class="id" title="definition">fact</span></a> 3.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="var">native_compute</span>. <span class="id" title="var">lia</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+For n &gt;= 3, the crossover point is higher 
+</div>
+<div class="code">
+<span class="id" title="keyword">Lemma</span> <a id="pow_ge_fact_4_base3" class="idref" href="#pow_ge_fact_4_base3"><span class="id" title="lemma">pow_ge_fact_4_base3</span></a> : <span class="id" title="definition">Nat.pow</span> 3 4 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#fact"><span class="id" title="definition">fact</span></a> 4.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="var">native_compute</span>. <span class="id" title="var">lia</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Key insight: XOR ambiguity matters most for 2-cell cages  where n possibilities vs n-1 for standard ops is the difference 
+<div class="paragraph"> </div>
+
+ General statement for cage_size = 2 (most common in puzzles) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="bitwise_increases_ambiguity" class="idref" href="#bitwise_increases_ambiguity"><span class="id" title="lemma">bitwise_increases_ambiguity</span></a> : <span class="id" title="keyword">forall</span> <a id="n:39" class="idref" href="#n:39"><span class="id" title="binder">n</span></a> <a id="cage_size:40" class="idref" href="#cage_size:40"><span class="id" title="binder">cage_size</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#n:39"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:40"><span class="id" title="variable">cage_size</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#max_ambiguity_bitwise"><span class="id" title="definition">max_ambiguity_bitwise</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:39"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:40"><span class="id" title="variable">cage_size</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#max_ambiguity_standard"><span class="id" title="definition">max_ambiguity_standard</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:39"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#cage_size:40"><span class="id" title="variable">cage_size</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">n</span> <span class="id" title="var">cage_size</span> <span class="id" title="var">Hn</span> <span class="id" title="var">Hc</span>. <span class="id" title="tactic">rewrite</span> <span class="id" title="var">Hc</span>. <span class="id" title="tactic">simpl</span>. <span class="id" title="var">lia</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab21"></a><h1 class="section">Constraint Expansion Theorem</h1>
+
+<div class="paragraph"> </div>
+
+ For 3x3 HARD+, we must expand constraints to increase difficulty  This is what keen_generate.c implements in Phase 2 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="difficulty_sufficient" class="idref" href="#difficulty_sufficient"><span class="id" title="definition">difficulty_sufficient</span></a> (<a id="n:41" class="idref" href="#n:41"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="base_diff:42" class="idref" href="#base_diff:42"><span class="id" title="binder">base_diff</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="modes:43" class="idref" href="#modes:43"><span class="id" title="binder">modes</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <span class="id" title="keyword">Prop</span> :=<br/>
+&nbsp;&nbsp;<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#solution_space"><span class="id" title="definition">solution_space</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:41"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 100 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#f031fe1957c4a4a8e217aa46af2b4e25"><span class="id" title="notation">\/</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#f031fe1957c4a4a8e217aa46af2b4e25"><span class="id" title="notation">(</span></a><a class="idref" href="KeenKenning.LatinEnum.html#n:41"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#base_diff:42"><span class="id" title="variable">base_diff</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#ba2b0e492d2b4675a0acf3ea92aabadd"><span class="id" title="notation">/\</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#modes:43"><span class="id" title="variable">modes</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#::nat_scope:x_'&gt;'_x"><span class="id" title="notation">&gt;</span></a> 0<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#f031fe1957c4a4a8e217aa46af2b4e25"><span class="id" title="notation">)</span></a>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="constraint_expansion_needed" class="idref" href="#constraint_expansion_needed"><span class="id" title="lemma">constraint_expansion_needed</span></a> : <span class="id" title="keyword">forall</span> <a id="base_diff:44" class="idref" href="#base_diff:44"><span class="id" title="binder">base_diff</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#base_diff:44"><span class="id" title="variable">base_diff</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a>  <br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#63a68285c81db8f9bc456233bb9ed181"><span class="id" title="notation">~</span></a><a class="idref" href="KeenKenning.LatinEnum.html#difficulty_sufficient"><span class="id" title="definition">difficulty_sufficient</span></a> 3 <a class="idref" href="KeenKenning.LatinEnum.html#base_diff:44"><span class="id" title="variable">base_diff</span></a> 0.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">base_diff</span> <span class="id" title="var">Hdiff</span> <span class="id" title="var">Hsuff</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.LatinEnum.html#difficulty_sufficient"><span class="id" title="definition">difficulty_sufficient</span></a> <span class="id" title="tactic">in</span> <span class="id" title="var">Hsuff</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">destruct</span> <span class="id" title="var">Hsuff</span> <span class="id" title="keyword">as</span> [<span class="id" title="var">Hspace</span> | [<span class="id" title="var">H3</span> [<span class="id" title="var">Hdiff2</span> <span class="id" title="var">Hmodes</span>]]].<br/>
+&nbsp;&nbsp;- <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="tactic">simpl</span> <span class="id" title="tactic">in</span> <span class="id" title="var">Hspace</span>. <span class="id" title="var">lia</span>.<br/>
+&nbsp;&nbsp;- <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lia</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="constraint_expansion_sufficient" class="idref" href="#constraint_expansion_sufficient"><span class="id" title="lemma">constraint_expansion_sufficient</span></a> : <span class="id" title="keyword">forall</span> <a id="base_diff:45" class="idref" href="#base_diff:45"><span class="id" title="binder">base_diff</span></a> <a id="modes:46" class="idref" href="#modes:46"><span class="id" title="binder">modes</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#base_diff:45"><span class="id" title="variable">base_diff</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#73030c22bc0b1fa771c65aa5414c65f9"><span class="id" title="notation">&gt;=</span></a> 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#modes:46"><span class="id" title="variable">modes</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#::nat_scope:x_'&gt;'_x"><span class="id" title="notation">&gt;</span></a> 0 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#difficulty_sufficient"><span class="id" title="definition">difficulty_sufficient</span></a> 3 <a class="idref" href="KeenKenning.LatinEnum.html#base_diff:45"><span class="id" title="variable">base_diff</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#modes:46"><span class="id" title="variable">modes</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">base_diff</span> <span class="id" title="var">modes</span> <span class="id" title="var">Hdiff</span> <span class="id" title="var">Hmodes</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.LatinEnum.html#difficulty_sufficient"><span class="id" title="definition">difficulty_sufficient</span></a>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">right</span>. <span class="id" title="tactic">auto</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab22"></a><h1 class="section">Summary of Mathematical Bounds</h1>
+
+<div class="paragraph"> </div>
+
+ Key facts proven:
+    1. There are exactly 12 Latin squares of order 3
+    2. There is exactly 1 reduced form
+    3. The relationship L(n) = n! * (n-1)! * R(n) holds
+    4. BITWISE operations increase ambiguity
+    5. 3x3 HARD+ requires constraint expansion (mode upgrade)
+
+<div class="paragraph"> </div>
+
+ Mode flags for constraint expansion (matching keen.h) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="MODE_KILLER" class="idref" href="#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> := 64. <span class="id" title="keyword">Definition</span> <a id="MODE_BITWISE" class="idref" href="#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a> := 2048. <span class="id" title="keyword">Definition</span> <a id="MODE_MODULAR" class="idref" href="#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a> := 32. 
+<br/>
+</div>
+
+<div class="doc">
+Auto-upgrade rule formalized 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="auto_upgrade_modes" class="idref" href="#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a> (<a id="n:47" class="idref" href="#n:47"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="diff:48" class="idref" href="#diff:48"><span class="id" title="binder">diff</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.LatinEnum.html#n:47"><span class="id" title="variable">n</span></a> <span class="id" title="notation">=?</span> 3 <span class="id" title="keyword">then</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.LatinEnum.html#diff:48"><span class="id" title="variable">diff</span></a> <span class="id" title="notation">&lt;?</span> 2 <span class="id" title="keyword">then</span> 0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.LatinEnum.html#diff:48"><span class="id" title="variable">diff</span></a> <span class="id" title="notation">=?</span> 2 <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.LatinEnum.html#diff:48"><span class="id" title="variable">diff</span></a> <span class="id" title="notation">=?</span> 3 <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">else</span> 0.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Verify auto-upgrade adds modes for 3x3 HARD+ 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_3x3_hard_adds_killer" class="idref" href="#auto_upgrade_3x3_hard_adds_killer"><span class="id" title="lemma">auto_upgrade_3x3_hard_adds_killer</span></a> :<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a> 3 2 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_3x3_extreme_adds_bitwise" class="idref" href="#auto_upgrade_3x3_extreme_adds_bitwise"><span class="id" title="lemma">auto_upgrade_3x3_extreme_adds_bitwise</span></a> :<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a> 3 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_3x3_unreasonable_adds_modular" class="idref" href="#auto_upgrade_3x3_unreasonable_adds_modular"><span class="id" title="lemma">auto_upgrade_3x3_unreasonable_adds_modular</span></a> :<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a> 3 4 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Nat.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_larger_grids_unchanged" class="idref" href="#auto_upgrade_larger_grids_unchanged"><span class="id" title="lemma">auto_upgrade_larger_grids_unchanged</span></a> : <span class="id" title="keyword">forall</span> <a id="n:49" class="idref" href="#n:49"><span class="id" title="binder">n</span></a> <a id="diff:50" class="idref" href="#diff:50"><span class="id" title="binder">diff</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.LatinEnum.html#n:49"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'&lt;&gt;'_x"><span class="id" title="notation">&lt;&gt;</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#n:49"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.LatinEnum.html#diff:50"><span class="id" title="variable">diff</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 0.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">n</span> <span class="id" title="var">diff</span> <span class="id" title="var">Hn</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.LatinEnum.html#auto_upgrade_modes"><span class="id" title="definition">auto_upgrade_modes</span></a>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">destruct</span> (<span class="id" title="var">n</span> <span class="id" title="notation">=?</span> 3) <span class="id" title="var">eqn</span>:<span class="id" title="var">E</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="tactic">apply</span> <span class="id" title="lemma">Nat.eqb_eq</span> <span class="id" title="tactic">in</span> <span class="id" title="var">E</span>. <span class="id" title="var">contradiction</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+</div>
+</div>
+
+<div id="footer">
+<hr/><a href="index.html">Index</a><hr/>This page has been generated by <a href="http://rocq-prover.org/">coqdoc</a>
+</div>
+
+</div>
+
+</body>
+</html>

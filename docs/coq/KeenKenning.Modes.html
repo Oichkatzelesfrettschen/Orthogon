@@ -1,0 +1,482 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<link href="coqdoc.css" rel="stylesheet" type="text/css" />
+<title>KeenKenning.Modes</title>
+</head>
+
+<body>
+
+<div id="page">
+
+<div id="header">
+</div>
+
+<div id="main">
+
+<h1 class="libtitle">Library KeenKenning.Modes</h1>
+
+<div class="code">
+</div>
+
+<div class="doc">
+<a id="lab23"></a><h1 class="section">Modes.v: Formal specification of KeenKenning game modes and constraints</h1>
+
+ *
+<a id="lab24"></a><h1 class="section">This module formally verifies:</h1>
+
+<a id="lab25"></a><h1 class="section">- Game mode bit flag correctness</h1>
+
+<a id="lab26"></a><h1 class="section">- Mode availability per flavor (Classik vs Kenning)</h1>
+
+<a id="lab27"></a><h1 class="section">- Grid size constraints per flavor</h1>
+
+<a id="lab28"></a><h1 class="section">- Difficulty level constraints</h1>
+
+<a id="lab29"></a><h1 class="section">- Mode/size/difficulty compatibility</h1>
+
+ *
+<a id="lab30"></a><h1 class="section">SPDX-License-Identifier: MIT</h1>
+
+<a id="lab31"></a><h1 class="section">SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors</h1>
+
+ 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">Arith</span>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">Bool</span>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">List</span>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">ZArith</span>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Stdlib</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <span class="id" title="library">Lia</span>.<br/>
+<span class="id" title="keyword">Import</span> <span class="id" title="module">ListNotations</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab32"></a><h1 class="section">Game Mode Definitions</h1>
+
+<div class="paragraph"> </div>
+
+ Mode flags as used in C layer (keen.h) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="MODE_STANDARD" class="idref" href="#MODE_STANDARD"><span class="id" title="definition">MODE_STANDARD</span></a>          := 0.<br/>
+<span class="id" title="keyword">Definition</span> <a id="MODE_MULTIPLICATION" class="idref" href="#MODE_MULTIPLICATION"><span class="id" title="definition">MODE_MULTIPLICATION</span></a>    := 1. <span class="id" title="keyword">Definition</span> <a id="MODE_MYSTERY" class="idref" href="#MODE_MYSTERY"><span class="id" title="definition">MODE_MYSTERY</span></a>           := 2. <span class="id" title="keyword">Definition</span> <a id="MODE_ZERO_INCLUSIVE" class="idref" href="#MODE_ZERO_INCLUSIVE"><span class="id" title="definition">MODE_ZERO_INCLUSIVE</span></a>    := 4. <span class="id" title="keyword">Definition</span> <a id="MODE_NEGATIVE" class="idref" href="#MODE_NEGATIVE"><span class="id" title="definition">MODE_NEGATIVE</span></a>          := 8. <span class="id" title="keyword">Definition</span> <a id="MODE_EXPONENT" class="idref" href="#MODE_EXPONENT"><span class="id" title="definition">MODE_EXPONENT</span></a>          := 16. <span class="id" title="keyword">Definition</span> <a id="MODE_MODULAR" class="idref" href="#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a>           := 32. <span class="id" title="keyword">Definition</span> <a id="MODE_KILLER" class="idref" href="#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a>            := 64. <span class="id" title="keyword">Definition</span> <a id="MODE_HINT" class="idref" href="#MODE_HINT"><span class="id" title="definition">MODE_HINT</span></a>              := 128. <span class="id" title="keyword">Definition</span> <a id="MODE_ADAPTIVE" class="idref" href="#MODE_ADAPTIVE"><span class="id" title="definition">MODE_ADAPTIVE</span></a>          := 256. <span class="id" title="keyword">Definition</span> <a id="MODE_STORY" class="idref" href="#MODE_STORY"><span class="id" title="definition">MODE_STORY</span></a>             := 512. <span class="id" title="keyword">Definition</span> <a id="MODE_BITWISE" class="idref" href="#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a>           := 2048. 
+<br/>
+</div>
+
+<div class="doc">
+Game mode enumeration 
+</div>
+<div class="code">
+<span class="id" title="keyword">Inductive</span> <a id="GameMode" class="idref" href="#GameMode"><span class="id" title="definition, inductive"><span id="GameMode_rect" class="id"><span id="GameMode_ind" class="id"><span id="GameMode_rec" class="id"><span id="GameMode_sind" class="id">GameMode</span></span></span></span></span></a> : <span class="id" title="keyword">Type</span> :=<br/>
+&nbsp;&nbsp;| <a id="Standard" class="idref" href="#Standard"><span class="id" title="constructor">Standard</span></a><br/>
+&nbsp;&nbsp;| <a id="MultiplicationOnly" class="idref" href="#MultiplicationOnly"><span class="id" title="constructor">MultiplicationOnly</span></a><br/>
+&nbsp;&nbsp;| <a id="Mystery" class="idref" href="#Mystery"><span class="id" title="constructor">Mystery</span></a><br/>
+&nbsp;&nbsp;| <a id="ZeroInclusive" class="idref" href="#ZeroInclusive"><span class="id" title="constructor">ZeroInclusive</span></a><br/>
+&nbsp;&nbsp;| <a id="NegativeNumbers" class="idref" href="#NegativeNumbers"><span class="id" title="constructor">NegativeNumbers</span></a><br/>
+&nbsp;&nbsp;| <a id="Exponent" class="idref" href="#Exponent"><span class="id" title="constructor">Exponent</span></a><br/>
+&nbsp;&nbsp;| <a id="Modular" class="idref" href="#Modular"><span class="id" title="constructor">Modular</span></a><br/>
+&nbsp;&nbsp;| <a id="Killer" class="idref" href="#Killer"><span class="id" title="constructor">Killer</span></a><br/>
+&nbsp;&nbsp;| <a id="HintMode" class="idref" href="#HintMode"><span class="id" title="constructor">HintMode</span></a><br/>
+&nbsp;&nbsp;| <a id="Adaptive" class="idref" href="#Adaptive"><span class="id" title="constructor">Adaptive</span></a><br/>
+&nbsp;&nbsp;| <a id="Story" class="idref" href="#Story"><span class="id" title="constructor">Story</span></a><br/>
+&nbsp;&nbsp;| <a id="Bitwise" class="idref" href="#Bitwise"><span class="id" title="constructor">Bitwise</span></a><br/>
+&nbsp;&nbsp;| <a id="Retro8Bit" class="idref" href="#Retro8Bit"><span class="id" title="constructor">Retro8Bit</span></a>. 
+<br/>
+</div>
+
+<div class="doc">
+Map mode to C flags 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="mode_to_flags" class="idref" href="#mode_to_flags"><span class="id" title="definition">mode_to_flags</span></a> (<a id="m:3" class="idref" href="#m:3"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#m:3"><span class="id" title="variable">m</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Standard"><span class="id" title="constructor">Standard</span></a>          =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_STANDARD"><span class="id" title="definition">MODE_STANDARD</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#MultiplicationOnly"><span class="id" title="constructor">MultiplicationOnly</span></a> =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_MULTIPLICATION"><span class="id" title="definition">MODE_MULTIPLICATION</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Mystery"><span class="id" title="constructor">Mystery</span></a>           =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_MYSTERY"><span class="id" title="definition">MODE_MYSTERY</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#ZeroInclusive"><span class="id" title="constructor">ZeroInclusive</span></a>     =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_ZERO_INCLUSIVE"><span class="id" title="definition">MODE_ZERO_INCLUSIVE</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#NegativeNumbers"><span class="id" title="constructor">NegativeNumbers</span></a>   =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_NEGATIVE"><span class="id" title="definition">MODE_NEGATIVE</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Exponent"><span class="id" title="constructor">Exponent</span></a>          =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_EXPONENT"><span class="id" title="definition">MODE_EXPONENT</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Modular"><span class="id" title="constructor">Modular</span></a>           =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Killer"><span class="id" title="constructor">Killer</span></a>            =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#HintMode"><span class="id" title="constructor">HintMode</span></a>          =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_HINT"><span class="id" title="definition">MODE_HINT</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Adaptive"><span class="id" title="constructor">Adaptive</span></a>          =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_ADAPTIVE"><span class="id" title="definition">MODE_ADAPTIVE</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Story"><span class="id" title="constructor">Story</span></a>             =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_STORY"><span class="id" title="definition">MODE_STORY</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Bitwise"><span class="id" title="constructor">Bitwise</span></a>           =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Retro8Bit"><span class="id" title="constructor">Retro8Bit</span></a>         =&gt; <a class="idref" href="KeenKenning.Modes.html#MODE_STANDARD"><span class="id" title="definition">MODE_STANDARD</span></a>  <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab33"></a><h1 class="section">Flavor Definitions</h1>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Inductive</span> <a id="Flavor" class="idref" href="#Flavor"><span class="id" title="definition, inductive"><span id="Flavor_rect" class="id"><span id="Flavor_ind" class="id"><span id="Flavor_rec" class="id"><span id="Flavor_sind" class="id">Flavor</span></span></span></span></span></a> : <span class="id" title="keyword">Type</span> :=<br/>
+&nbsp;&nbsp;| <a id="Classik" class="idref" href="#Classik"><span class="id" title="constructor">Classik</span></a>   <br/>
+&nbsp;&nbsp;| <a id="Kenning" class="idref" href="#Kenning"><span class="id" title="constructor">Kenning</span></a>. 
+<br/>
+</div>
+
+<div class="doc">
+Classik flavor only supports Standard and Retro8Bit 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="classik_modes" class="idref" href="#classik_modes"><span class="id" title="definition">classik_modes</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="notation">[</span><a class="idref" href="KeenKenning.Modes.html#Standard"><span class="id" title="constructor">Standard</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Retro8Bit"><span class="id" title="constructor">Retro8Bit</span></a><span class="id" title="notation">]</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Kenning flavor supports all modes 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="kenning_modes" class="idref" href="#kenning_modes"><span class="id" title="definition">kenning_modes</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#list"><span class="id" title="inductive">list</span></a> <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="notation">[</span><a class="idref" href="KeenKenning.Modes.html#Standard"><span class="id" title="constructor">Standard</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#MultiplicationOnly"><span class="id" title="constructor">MultiplicationOnly</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Mystery"><span class="id" title="constructor">Mystery</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#ZeroInclusive"><span class="id" title="constructor">ZeroInclusive</span></a><span class="id" title="notation">;</span><br/>
+&nbsp;&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#NegativeNumbers"><span class="id" title="constructor">NegativeNumbers</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Exponent"><span class="id" title="constructor">Exponent</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Modular"><span class="id" title="constructor">Modular</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Killer"><span class="id" title="constructor">Killer</span></a><span class="id" title="notation">;</span><br/>
+&nbsp;&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#HintMode"><span class="id" title="constructor">HintMode</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Adaptive"><span class="id" title="constructor">Adaptive</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Story"><span class="id" title="constructor">Story</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Bitwise"><span class="id" title="constructor">Bitwise</span></a><span class="id" title="notation">;</span> <a class="idref" href="KeenKenning.Modes.html#Retro8Bit"><span class="id" title="constructor">Retro8Bit</span></a><span class="id" title="notation">]</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Check if mode is available in flavor 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="mode_available" class="idref" href="#mode_available"><span class="id" title="definition">mode_available</span></a> (<a id="f:7" class="idref" href="#f:7"><span class="id" title="binder">f</span></a> : <a class="idref" href="KeenKenning.Modes.html#Flavor"><span class="id" title="inductive">Flavor</span></a>) (<a id="m:8" class="idref" href="#m:8"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#bool"><span class="id" title="inductive">bool</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#f:7"><span class="id" title="variable">f</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Classik"><span class="id" title="constructor">Classik</span></a> =&gt; <span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#m:8"><span class="id" title="variable">m</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Standard"><span class="id" title="constructor">Standard</span></a> | <a class="idref" href="KeenKenning.Modes.html#Retro8Bit"><span class="id" title="constructor">Retro8Bit</span></a> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#false"><span class="id" title="constructor">false</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">end</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Kenning"><span class="id" title="constructor">Kenning</span></a> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a>  <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab34"></a><h1 class="section">Grid Size Constraints</h1>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="MIN_GRID_SIZE_CLASSIK" class="idref" href="#MIN_GRID_SIZE_CLASSIK"><span class="id" title="definition">MIN_GRID_SIZE_CLASSIK</span></a> := 3.<br/>
+<span class="id" title="keyword">Definition</span> <a id="MAX_GRID_SIZE_CLASSIK" class="idref" href="#MAX_GRID_SIZE_CLASSIK"><span class="id" title="definition">MAX_GRID_SIZE_CLASSIK</span></a> := 9.<br/>
+<span class="id" title="keyword">Definition</span> <a id="MIN_GRID_SIZE_KENNING" class="idref" href="#MIN_GRID_SIZE_KENNING"><span class="id" title="definition">MIN_GRID_SIZE_KENNING</span></a> := 3.<br/>
+<span class="id" title="keyword">Definition</span> <a id="MAX_GRID_SIZE_KENNING" class="idref" href="#MAX_GRID_SIZE_KENNING"><span class="id" title="definition">MAX_GRID_SIZE_KENNING</span></a> := 16.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Maximum grid size for extended modes (Zero/Negative/Modular/Exponent) 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="MAX_EXTENDED_MODE_SIZE" class="idref" href="#MAX_EXTENDED_MODE_SIZE"><span class="id" title="definition">MAX_EXTENDED_MODE_SIZE</span></a> := 9.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Grid size bounds per flavor 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="min_grid_size" class="idref" href="#min_grid_size"><span class="id" title="definition">min_grid_size</span></a> (<a id="f:11" class="idref" href="#f:11"><span class="id" title="binder">f</span></a> : <a class="idref" href="KeenKenning.Modes.html#Flavor"><span class="id" title="inductive">Flavor</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#f:11"><span class="id" title="variable">f</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Classik"><span class="id" title="constructor">Classik</span></a> =&gt; <a class="idref" href="KeenKenning.Modes.html#MIN_GRID_SIZE_CLASSIK"><span class="id" title="definition">MIN_GRID_SIZE_CLASSIK</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Kenning"><span class="id" title="constructor">Kenning</span></a> =&gt; <a class="idref" href="KeenKenning.Modes.html#MIN_GRID_SIZE_KENNING"><span class="id" title="definition">MIN_GRID_SIZE_KENNING</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="max_grid_size" class="idref" href="#max_grid_size"><span class="id" title="definition">max_grid_size</span></a> (<a id="f:13" class="idref" href="#f:13"><span class="id" title="binder">f</span></a> : <a class="idref" href="KeenKenning.Modes.html#Flavor"><span class="id" title="inductive">Flavor</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#f:13"><span class="id" title="variable">f</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Classik"><span class="id" title="constructor">Classik</span></a> =&gt; <a class="idref" href="KeenKenning.Modes.html#MAX_GRID_SIZE_CLASSIK"><span class="id" title="definition">MAX_GRID_SIZE_CLASSIK</span></a><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Kenning"><span class="id" title="constructor">Kenning</span></a> =&gt; <a class="idref" href="KeenKenning.Modes.html#MAX_GRID_SIZE_KENNING"><span class="id" title="definition">MAX_GRID_SIZE_KENNING</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Check if grid size is valid for flavor 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="valid_grid_size" class="idref" href="#valid_grid_size"><span class="id" title="definition">valid_grid_size</span></a> (<a id="f:15" class="idref" href="#f:15"><span class="id" title="binder">f</span></a> : <a class="idref" href="KeenKenning.Modes.html#Flavor"><span class="id" title="inductive">Flavor</span></a>) (<a id="n:16" class="idref" href="#n:16"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#bool"><span class="id" title="inductive">bool</span></a> :=<br/>
+&nbsp;&nbsp;<a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#andb"><span class="id" title="definition">andb</span></a> (<a class="idref" href="KeenKenning.Modes.html#min_grid_size"><span class="id" title="definition">min_grid_size</span></a> <a class="idref" href="KeenKenning.Modes.html#f:15"><span class="id" title="variable">f</span></a> <span class="id" title="notation">&lt;=?</span> <a class="idref" href="KeenKenning.Modes.html#n:16"><span class="id" title="variable">n</span></a>) (<a class="idref" href="KeenKenning.Modes.html#n:16"><span class="id" title="variable">n</span></a> <span class="id" title="notation">&lt;=?</span> <a class="idref" href="KeenKenning.Modes.html#max_grid_size"><span class="id" title="definition">max_grid_size</span></a> <a class="idref" href="KeenKenning.Modes.html#f:15"><span class="id" title="variable">f</span></a>).<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Extended modes have size limits 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="is_extended_mode" class="idref" href="#is_extended_mode"><span class="id" title="definition">is_extended_mode</span></a> (<a id="m:17" class="idref" href="#m:17"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#bool"><span class="id" title="inductive">bool</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#m:17"><span class="id" title="variable">m</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#ZeroInclusive"><span class="id" title="constructor">ZeroInclusive</span></a> | <a class="idref" href="KeenKenning.Modes.html#NegativeNumbers"><span class="id" title="constructor">NegativeNumbers</span></a> | <a class="idref" href="KeenKenning.Modes.html#Modular"><span class="id" title="constructor">Modular</span></a> | <a class="idref" href="KeenKenning.Modes.html#Exponent"><span class="id" title="constructor">Exponent</span></a> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a><br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#false"><span class="id" title="constructor">false</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Check if mode/size combination is valid 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="valid_mode_size" class="idref" href="#valid_mode_size"><span class="id" title="definition">valid_mode_size</span></a> (<a id="m:19" class="idref" href="#m:19"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>) (<a id="n:20" class="idref" href="#n:20"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#bool"><span class="id" title="inductive">bool</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.Modes.html#is_extended_mode"><span class="id" title="definition">is_extended_mode</span></a> <a class="idref" href="KeenKenning.Modes.html#m:19"><span class="id" title="variable">m</span></a> <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.Modes.html#n:20"><span class="id" title="variable">n</span></a> <span class="id" title="notation">&lt;=?</span> <a class="idref" href="KeenKenning.Modes.html#MAX_EXTENDED_MODE_SIZE"><span class="id" title="definition">MAX_EXTENDED_MODE_SIZE</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">else</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab35"></a><h1 class="section">Difficulty Definitions</h1>
+
+<div class="paragraph"> </div>
+
+ 7 difficulty levels matching keen.c DIFFLIST 
+</div>
+<div class="code">
+<span class="id" title="keyword">Inductive</span> <a id="Difficulty" class="idref" href="#Difficulty"><span class="id" title="definition, inductive"><span id="Difficulty_rect" class="id"><span id="Difficulty_ind" class="id"><span id="Difficulty_rec" class="id"><span id="Difficulty_sind" class="id">Difficulty</span></span></span></span></span></a> : <span class="id" title="keyword">Type</span> :=<br/>
+&nbsp;&nbsp;| <a id="Easy" class="idref" href="#Easy"><span class="id" title="constructor">Easy</span></a>            <br/>
+&nbsp;&nbsp;| <a id="Normal" class="idref" href="#Normal"><span class="id" title="constructor">Normal</span></a>          <br/>
+&nbsp;&nbsp;| <a id="Hard" class="idref" href="#Hard"><span class="id" title="constructor">Hard</span></a>            <br/>
+&nbsp;&nbsp;| <a id="Extreme" class="idref" href="#Extreme"><span class="id" title="constructor">Extreme</span></a>         <br/>
+&nbsp;&nbsp;| <a id="Unreasonable" class="idref" href="#Unreasonable"><span class="id" title="constructor">Unreasonable</span></a>    <br/>
+&nbsp;&nbsp;| <a id="Ludicrous" class="idref" href="#Ludicrous"><span class="id" title="constructor">Ludicrous</span></a>       <br/>
+&nbsp;&nbsp;| <a id="Incomprehensible" class="idref" href="#Incomprehensible"><span class="id" title="constructor">Incomprehensible</span></a>. 
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="difficulty_to_level" class="idref" href="#difficulty_to_level"><span class="id" title="definition">difficulty_to_level</span></a> (<a id="d:23" class="idref" href="#d:23"><span class="id" title="binder">d</span></a> : <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#d:23"><span class="id" title="variable">d</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Easy"><span class="id" title="constructor">Easy</span></a>            =&gt; 0<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Normal"><span class="id" title="constructor">Normal</span></a>          =&gt; 1<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Hard"><span class="id" title="constructor">Hard</span></a>            =&gt; 2<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Extreme"><span class="id" title="constructor">Extreme</span></a>         =&gt; 3<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Unreasonable"><span class="id" title="constructor">Unreasonable</span></a>    =&gt; 4<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Ludicrous"><span class="id" title="constructor">Ludicrous</span></a>       =&gt; 5<br/>
+&nbsp;&nbsp;| <a class="idref" href="KeenKenning.Modes.html#Incomprehensible"><span class="id" title="constructor">Incomprehensible</span></a> =&gt; 6<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="level_to_difficulty" class="idref" href="#level_to_difficulty"><span class="id" title="definition">level_to_difficulty</span></a> (<a id="n:25" class="idref" href="#n:25"><span class="id" title="binder">n</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#option"><span class="id" title="inductive">option</span></a> <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">match</span> <a class="idref" href="KeenKenning.Modes.html#n:25"><span class="id" title="variable">n</span></a> <span class="id" title="keyword">with</span><br/>
+&nbsp;&nbsp;| 0 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Easy"><span class="id" title="constructor">Easy</span></a><br/>
+&nbsp;&nbsp;| 1 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Normal"><span class="id" title="constructor">Normal</span></a><br/>
+&nbsp;&nbsp;| 2 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Hard"><span class="id" title="constructor">Hard</span></a><br/>
+&nbsp;&nbsp;| 3 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Extreme"><span class="id" title="constructor">Extreme</span></a><br/>
+&nbsp;&nbsp;| 4 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Unreasonable"><span class="id" title="constructor">Unreasonable</span></a><br/>
+&nbsp;&nbsp;| 5 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Ludicrous"><span class="id" title="constructor">Ludicrous</span></a><br/>
+&nbsp;&nbsp;| 6 =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#Incomprehensible"><span class="id" title="constructor">Incomprehensible</span></a><br/>
+&nbsp;&nbsp;| <span class="id" title="var">_</span> =&gt; <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#None"><span class="id" title="constructor">None</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">end</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+All difficulties are valid for all grid sizes after Phase 2 auto-upgrade 
+</div>
+<div class="code">
+<span class="id" title="keyword">Definition</span> <a id="valid_difficulty" class="idref" href="#valid_difficulty"><span class="id" title="definition">valid_difficulty</span></a> (<span class="id" title="var">_</span> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<span class="id" title="var">_</span> : <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#bool"><span class="id" title="inductive">bool</span></a> := <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab36"></a><h1 class="section">3x3 Auto Mode Upgrade (Phase 2 implementation)</h1>
+
+    For 3x3 grids at HARD+ difficulty, modes are automatically upgraded:
+<ul class="doclist">
+<li> HARD: Auto-enables KILLER
+
+</li>
+<li> EXTREME: Auto-enables KILLER + BITWISE
+
+</li>
+<li> UNREASONABLE+: Auto-enables KILLER + BITWISE + MODULAR
+
+</li>
+</ul>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="auto_upgrade_flags" class="idref" href="#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a> (<a id="grid_size:27" class="idref" href="#grid_size:27"><span class="id" title="binder">grid_size</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) (<a id="d:28" class="idref" href="#d:28"><span class="id" title="binder">d</span></a> : <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a>) (<a id="base_flags:29" class="idref" href="#base_flags:29"><span class="id" title="binder">base_flags</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a>) : <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a> :=<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">if</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#negb"><span class="id" title="definition">negb</span></a> (<a class="idref" href="KeenKenning.Modes.html#grid_size:27"><span class="id" title="variable">grid_size</span></a> <span class="id" title="notation">=?</span> 3) <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.Modes.html#base_flags:29"><span class="id" title="variable">base_flags</span></a><br/>
+&nbsp;&nbsp;<span class="id" title="keyword">else</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">let</span> <a id="level:30" class="idref" href="#level:30"><span class="id" title="binder">level</span></a> := <a class="idref" href="KeenKenning.Modes.html#difficulty_to_level"><span class="id" title="definition">difficulty_to_level</span></a> <a class="idref" href="KeenKenning.Modes.html#d:28"><span class="id" title="variable">d</span></a> <span class="id" title="tactic">in</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.Modes.html#level:30"><span class="id" title="variable">level</span></a> <span class="id" title="notation">&lt;?</span> 2 <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.Modes.html#base_flags:29"><span class="id" title="variable">base_flags</span></a>  <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.Modes.html#level:30"><span class="id" title="variable">level</span></a> <span class="id" title="notation">=?</span> 2 <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.Modes.html#base_flags:29"><span class="id" title="variable">base_flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a>  <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <span class="id" title="keyword">if</span> <a class="idref" href="KeenKenning.Modes.html#level:30"><span class="id" title="variable">level</span></a> <span class="id" title="notation">=?</span> 3 <span class="id" title="keyword">then</span> <a class="idref" href="KeenKenning.Modes.html#base_flags:29"><span class="id" title="variable">base_flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a>  <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="keyword">else</span> <a class="idref" href="KeenKenning.Modes.html#base_flags:29"><span class="id" title="variable">base_flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_MODULAR"><span class="id" title="definition">MODE_MODULAR</span></a>. 
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab37"></a><h1 class="section">Validation Theorems</h1>
+
+<div class="paragraph"> </div>
+
+ Mode flags are powers of 2 (single bit set) or zero 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="mode_flags_valid" class="idref" href="#mode_flags_valid"><span class="id" title="lemma">mode_flags_valid</span></a> : <span class="id" title="keyword">forall</span> <a id="m:31" class="idref" href="#m:31"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>,<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">let</span> <a id="flags:32" class="idref" href="#flags:32"><span class="id" title="binder">flags</span></a> := <a class="idref" href="KeenKenning.Modes.html#mode_to_flags"><span class="id" title="definition">mode_to_flags</span></a> <a class="idref" href="KeenKenning.Modes.html#m:31"><span class="id" title="variable">m</span></a> <span class="id" title="tactic">in</span><br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#flags:32"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 0 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#f031fe1957c4a4a8e217aa46af2b4e25"><span class="id" title="notation">\/</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#a883bdd010993579f99d60b3775bcf54"><span class="id" title="notation">exists</span></a> <a id="k:33" class="idref" href="#k:33"><span class="id" title="binder">k</span></a><a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#a883bdd010993579f99d60b3775bcf54"><span class="id" title="notation">,</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:32"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> 2<span class="id" title="notation">^</span><a class="idref" href="KeenKenning.Modes.html#k:33"><span class="id" title="variable">k</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">m</span>. <span class="id" title="tactic">simpl</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">destruct</span> <span class="id" title="var">m</span>; <span class="id" title="tactic">simpl</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="tactic">left</span>. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 0. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 1. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 2. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 3. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 4. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 5. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 6. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 7. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 8. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 9. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">right</span>. <span class="id" title="tactic">exists</span> 11. <span class="id" title="tactic">reflexivity</span>. &nbsp;&nbsp;- <span class="id" title="tactic">left</span>. <span class="id" title="tactic">reflexivity</span>. <span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Classik modes are subset of Kenning modes 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="classik_subset_kenning" class="idref" href="#classik_subset_kenning"><span class="id" title="lemma">classik_subset_kenning</span></a> : <span class="id" title="keyword">forall</span> <a id="m:34" class="idref" href="#m:34"><span class="id" title="binder">m</span></a> : <a class="idref" href="KeenKenning.Modes.html#GameMode"><span class="id" title="inductive">GameMode</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#mode_available"><span class="id" title="definition">mode_available</span></a> <a class="idref" href="KeenKenning.Modes.html#Classik"><span class="id" title="constructor">Classik</span></a> <a class="idref" href="KeenKenning.Modes.html#m:34"><span class="id" title="variable">m</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.Modes.html#mode_available"><span class="id" title="definition">mode_available</span></a> <a class="idref" href="KeenKenning.Modes.html#Kenning"><span class="id" title="constructor">Kenning</span></a> <a class="idref" href="KeenKenning.Modes.html#m:34"><span class="id" title="variable">m</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#true"><span class="id" title="constructor">true</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">m</span> <span class="id" title="var">H</span>. <span class="id" title="tactic">simpl</span>. <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Grid size bounds are consistent 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="grid_bounds_consistent" class="idref" href="#grid_bounds_consistent"><span class="id" title="lemma">grid_bounds_consistent</span></a> : <span class="id" title="keyword">forall</span> <a id="f:35" class="idref" href="#f:35"><span class="id" title="binder">f</span></a> : <a class="idref" href="KeenKenning.Modes.html#Flavor"><span class="id" title="inductive">Flavor</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#min_grid_size"><span class="id" title="definition">min_grid_size</span></a> <a class="idref" href="KeenKenning.Modes.html#f:35"><span class="id" title="variable">f</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#cb53cf0ee22c036a03b4a9281c68b5a3"><span class="id" title="notation">&lt;=</span></a> <a class="idref" href="KeenKenning.Modes.html#max_grid_size"><span class="id" title="definition">max_grid_size</span></a> <a class="idref" href="KeenKenning.Modes.html#f:35"><span class="id" title="variable">f</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">f</span>. <span class="id" title="tactic">destruct</span> <span class="id" title="var">f</span>; <span class="id" title="tactic">simpl</span>.<br/>
+&nbsp;&nbsp;-  <span class="id" title="tactic">repeat</span> <span class="id" title="tactic">constructor</span>.<br/>
+&nbsp;&nbsp;-  <span class="id" title="tactic">repeat</span> <span class="id" title="tactic">constructor</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Difficulty levels are sequential 0-6 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="difficulty_levels_sequential" class="idref" href="#difficulty_levels_sequential"><span class="id" title="lemma">difficulty_levels_sequential</span></a> : <span class="id" title="keyword">forall</span> <a id="d:36" class="idref" href="#d:36"><span class="id" title="binder">d</span></a> : <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#difficulty_to_level"><span class="id" title="definition">difficulty_to_level</span></a> <a class="idref" href="KeenKenning.Modes.html#d:36"><span class="id" title="variable">d</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#cb53cf0ee22c036a03b4a9281c68b5a3"><span class="id" title="notation">&lt;=</span></a> 6.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">d</span>. <span class="id" title="tactic">destruct</span> <span class="id" title="var">d</span>; <span class="id" title="tactic">simpl</span>; <span class="id" title="tactic">repeat</span> <span class="id" title="tactic">constructor</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Level-to-difficulty roundtrip 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="difficulty_roundtrip" class="idref" href="#difficulty_roundtrip"><span class="id" title="lemma">difficulty_roundtrip</span></a> : <span class="id" title="keyword">forall</span> <a id="d:37" class="idref" href="#d:37"><span class="id" title="binder">d</span></a> : <a class="idref" href="KeenKenning.Modes.html#Difficulty"><span class="id" title="inductive">Difficulty</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#level_to_difficulty"><span class="id" title="definition">level_to_difficulty</span></a> (<a class="idref" href="KeenKenning.Modes.html#difficulty_to_level"><span class="id" title="definition">difficulty_to_level</span></a> <a class="idref" href="KeenKenning.Modes.html#d:37"><span class="id" title="variable">d</span></a>) <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Datatypes.html#Some"><span class="id" title="constructor">Some</span></a> <a class="idref" href="KeenKenning.Modes.html#d:37"><span class="id" title="variable">d</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">d</span>. <span class="id" title="tactic">destruct</span> <span class="id" title="var">d</span>; <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Auto-upgrade preserves base flags 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_preserves_base" class="idref" href="#auto_upgrade_preserves_base"><span class="id" title="lemma">auto_upgrade_preserves_base</span></a> : <span class="id" title="keyword">forall</span> <a id="n:38" class="idref" href="#n:38"><span class="id" title="binder">n</span></a> <a id="d:39" class="idref" href="#d:39"><span class="id" title="binder">d</span></a> <a id="flags:40" class="idref" href="#flags:40"><span class="id" title="binder">flags</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#n:38"><span class="id" title="variable">n</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'&lt;&gt;'_x"><span class="id" title="notation">&lt;&gt;</span></a> 3 <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a> <a class="idref" href="KeenKenning.Modes.html#n:38"><span class="id" title="variable">n</span></a> <a class="idref" href="KeenKenning.Modes.html#d:39"><span class="id" title="variable">d</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:40"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:40"><span class="id" title="variable">flags</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">n</span> <span class="id" title="var">d</span> <span class="id" title="var">flags</span> <span class="id" title="var">H</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">destruct</span> (<span class="id" title="var">n</span> <span class="id" title="notation">=?</span> 3) <span class="id" title="var">eqn</span>:<span class="id" title="var">E</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="tactic">apply</span> <span class="id" title="lemma">Nat.eqb_eq</span> <span class="id" title="tactic">in</span> <span class="id" title="var">E</span>. <span class="id" title="var">contradiction</span>.<br/>
+&nbsp;&nbsp;- <span class="id" title="tactic">simpl</span>. <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Auto-upgrade adds constraint modes for 3x3 Hard+ 
+</div>
+<div class="code">
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_3x3_hard" class="idref" href="#auto_upgrade_3x3_hard"><span class="id" title="lemma">auto_upgrade_3x3_hard</span></a> : <span class="id" title="keyword">forall</span> <a id="flags:41" class="idref" href="#flags:41"><span class="id" title="binder">flags</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a> 3 <a class="idref" href="KeenKenning.Modes.html#Hard"><span class="id" title="constructor">Hard</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:41"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:41"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">flags</span>. <span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a>. <span class="id" title="tactic">simpl</span>. <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Theorem</span> <a id="auto_upgrade_3x3_extreme" class="idref" href="#auto_upgrade_3x3_extreme"><span class="id" title="lemma">auto_upgrade_3x3_extreme</span></a> : <span class="id" title="keyword">forall</span> <a id="flags:42" class="idref" href="#flags:42"><span class="id" title="binder">flags</span></a>,<br/>
+&nbsp;&nbsp;<a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a> 3 <a class="idref" href="KeenKenning.Modes.html#Extreme"><span class="id" title="constructor">Extreme</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:42"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Logic.html#6cd0f7b28b6092304087c7049437bb1a"><span class="id" title="notation">=</span></a> <a class="idref" href="KeenKenning.Modes.html#flags:42"><span class="id" title="variable">flags</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_KILLER"><span class="id" title="definition">MODE_KILLER</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.0/stdlib//Corelib.Init.Peano.html#0dacc1786c5ba797d47dd85006231633"><span class="id" title="notation">+</span></a> <a class="idref" href="KeenKenning.Modes.html#MODE_BITWISE"><span class="id" title="definition">MODE_BITWISE</span></a>.<br/>
+<span class="id" title="keyword">Proof</span>.<br/>
+&nbsp;&nbsp;<span class="id" title="tactic">intros</span> <span class="id" title="var">flags</span>. <span class="id" title="tactic">unfold</span> <a class="idref" href="KeenKenning.Modes.html#auto_upgrade_flags"><span class="id" title="definition">auto_upgrade_flags</span></a>. <span class="id" title="tactic">simpl</span>. <span class="id" title="tactic">reflexivity</span>.<br/>
+<span class="id" title="keyword">Qed</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab38"></a><h1 class="section">Constants Summary for C Implementation</h1>
+
+
+<div class="paragraph"> </div>
+
+    Mode flags:
+      MODE_STANDARD          = 0x00
+      MODE_MULTIPLICATION    = 0x01
+      MODE_MYSTERY           = 0x02
+      MODE_ZERO_INCLUSIVE    = 0x04
+      MODE_NEGATIVE          = 0x08
+      MODE_EXPONENT          = 0x10
+      MODE_MODULAR           = 0x20
+      MODE_KILLER            = 0x40
+      MODE_HINT              = 0x80
+      MODE_ADAPTIVE          = 0x100
+      MODE_STORY             = 0x200
+      MODE_BITWISE           = 0x800
+
+<div class="paragraph"> </div>
+
+    Grid size bounds:
+      MIN_GRID_SIZE_CLASSIK  = 3
+      MAX_GRID_SIZE_CLASSIK  = 9
+      MIN_GRID_SIZE_KENNING  = 3
+      MAX_GRID_SIZE_KENNING  = 16
+      MAX_EXTENDED_MODE_SIZE = 9
+
+</div>
+<div class="code">
+</div>
+</div>
+
+<div id="footer">
+<hr/><a href="index.html">Index</a><hr/>This page has been generated by <a href="http://rocq-prover.org/">coqdoc</a>
+</div>
+
+</div>
+
+</body>
+</html>
