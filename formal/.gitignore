@@ -31,3 +31,4 @@ core.*
 # Editor backups
 *~
 \#*\#
+mathcomp/

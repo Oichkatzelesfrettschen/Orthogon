@@ -164,6 +164,7 @@ cd formal && rocq compile SolverTypes.v
 
 | Module | Status | Proven | Admitted | Description |
 |--------|--------|--------|----------|-------------|
+| SolverSpec.v | Phase 3 | ~30 | 7 | Solver spec + invariant preservation |
 | SolverTypes.v | Phase 1 Done | 6 | 1 | Core types + latin soundness |
 | DSF.v | Partial | 8 | 3 | Disjoint Set Forest (Union-Find) |
 | CageOps.v | Phase 1 Done | 17 | 0 | Cage operation evaluation |
@@ -172,11 +173,14 @@ cd formal && rocq compile SolverTypes.v
 | LatinSquare.v | Complete | 2 | 2 | Latin square constraints |
 
 **Key Proven Theorems**:
+- `place_preserves_invariant` - Digit placement preserves solver invariant
+- `apply_iscratch_cells_preserves_invariant` - Iscratch application preserves invariant
+- `elimination_preserves_invariant` - Single elimination preserves solver invariant
+- `solver_loop_terminates` - Solver terminates with fuel
+- `cube_eliminate_preserves_other` - Elimination preserves unrelated positions
+- `propagate_row/col_eliminates` - Propagation correctly eliminates
 - `latin_constraint_sound` - Valid Latin grid cells contain valid digits
-- `canonify_is_root` - DSF canonify returns root elements
 - `cage_satisfiedb_reflect` - Boolean/Prop equivalence for cage satisfaction
-- `dsf_init_wf` - Initial DSF is well-formed
-- `dsf_equiv_refl/sym/trans` - DSF equivalence is an equivalence relation
 
 **Extraction Strategy**:
 - Current: Standard OCaml extraction + hand-written C bridge

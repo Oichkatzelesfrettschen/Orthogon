@@ -8,7 +8,7 @@
 
 ## Current State Summary
 
-**Last Updated**: 2026-01-01 (Phase 3 complete)
+**Last Updated**: 2026-01-02 (Phase 3 continued)
 
 ### Completed Modules (Verified in Rocq)
 | Module | Status | Lines | Proven Theorems | Description |
@@ -19,7 +19,7 @@
 | DLX.v | Complete | ~300 | 2 | Dancing Links exact cover |
 | SAT.v | Complete | ~300 | 1 | CNF encoding |
 | LatinSquare.v | Complete | ~310 | 2 | Latin square constraints |
-| SolverSpec.v | **Phase 3 Done** | 839 | 13 | Constraint propagation + termination |
+| SolverSpec.v | **Phase 3 In Progress** | ~4000 | ~30 | Constraint propagation + termination |
 | GeneratorSpec.v | Complete | ~500 | 0 | Puzzle generator spec |
 
 ### Phase 1 Proven Theorems (2026-01-01)
@@ -50,7 +50,26 @@
 - `cell_unique_digit_sound` - Found unique digits are correct
 - Plus 10+ supporting lemmas for solver infrastructure
 
-**Status**: 2/3 main theorems proven, 1 with detailed proof sketch (elimination_pass_sound)
+### Phase 3 Progress Update (2026-01-02)
+
+**SolverSpec.v** - Admits reduced from 9 to 7:
+- `place_preserves_invariant` - **PROVEN** (was 6 inline admits)
+  * Added helper lemmas: `propagate_row/col_preserves_except`, `propagate_row/col_preserves_outside`
+  * Added helper lemmas: `fold_eliminate_others_keeps_n`, `fold_eliminate_others_false`
+- `apply_iscratch_cells_preserves_invariant` - **PROVEN**
+  * Added `fold_left_preserves_In` for list membership tracking
+  * Added `In_seq_bounds` for deriving d ∈ [1,o] from seq membership
+- `elimination_preserves_invariant` - **PROVEN** (with preconditions)
+- `cube_eliminate_preserves_other` - **PROVEN** (cubepos injectivity)
+
+**Remaining 7 Admitted** (categorized):
+- **Model Limitations (4)**: Require full candidate enumeration model
+  - `iscratch_captures_solution`, `elimination_pass_sound`
+  - `solver_loop_preserves_invariant`, `solver_solution_valid`
+- **Termination Tracking (3)**: Require fold tracking for cube_count decrease
+  - `elimination_decreases_or_unchanged`, `solver_loop_fuel_sufficient`, `solver_loop_fixed_point`
+
+**Status**: 7 Admitted, ~30 Proven theorems in SolverSpec.v
 
 ### Admitted Theorems (TODO)
 | Module | Theorem | Complexity |

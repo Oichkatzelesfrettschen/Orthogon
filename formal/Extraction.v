@@ -51,8 +51,10 @@ Extract Constant Z.to_nat => "(fun z -> if z < 0 then 0 else z)".
 
 (** ** Extraction Commands *)
 
-(* Create output directory *)
-(* Run: mkdir -p extracted *)
+(* Set extraction output directory (required by Rocq 9.x) *)
+Set Extraction Output Directory ".".
+
+(* Create output directory: mkdir -p extracted *)
 
 (* Extract DLX module *)
 Extraction "extracted/DLX.ml"

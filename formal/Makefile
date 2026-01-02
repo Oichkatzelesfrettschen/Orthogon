@@ -2,8 +2,25 @@
 # KeenKenning Project
 # SPDX-License-Identifier: MIT
 
-COQC = coqc
-COQFLAGS = -Q . KeenKenning -w +default
+# =============================================================================
+# Switch Configuration
+# =============================================================================
+# Main development: rocq-9.1.0 (OCaml 5.4.0 + Rocq 9.1.0)
+# Verified extraction: keen-verified (OCaml 4.14.2 + Rocq 9.0.0)
+#
+# The Makefile enforces switch usage to prevent PATH-based surprises.
+# =============================================================================
+
+OPAM_SWITCH_MAIN := rocq-9.1.0
+OPAM_SWITCH_VERIFIED := keen-verified
+OPAM := opam
+
+# Rocq 9.1.0 compiler with switch enforcement
+ROCQC = $(OPAM) exec --switch=$(OPAM_SWITCH_MAIN) -- rocq compile
+ROCQFLAGS = -Q . KeenKenning -w +default
+
+# Verified extraction uses Rocq 9.0.0 (required by rocq-verified-extraction)
+ROCQC_VERIFIED = $(OPAM) exec --switch=$(OPAM_SWITCH_VERIFIED) -- rocq compile
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -std=c23 -I../app/src/main/jni
 Z3 = z3
@@ -11,10 +28,24 @@ Z3 = z3
 # JNI directory (for dlx.c)
 JNI_DIR = ../app/src/main/jni
 
-# Coq sources (order matters for dependencies)
-COQ_SOURCES = LatinSquare.v DLX.v SAT.v Extraction.v
+# =============================================================================
+# Coq/Rocq Sources (order matters for dependencies)
+# =============================================================================
+
+# Core specification files (verified with Rocq 9.1.0)
+SPEC_SOURCES = SolverTypes.v DSF.v CageOps.v LatinSquare.v Modes.v \
+               DLX.v SAT.v SolverSpec.v GeneratorSpec.v
+
+# Extraction files (legacy OCaml extraction)
+EXTRACT_SOURCES = Extraction.v ExtractSolver.v
+
+# All Coq sources for main build
+COQ_SOURCES = $(SPEC_SOURCES) $(EXTRACT_SOURCES)
 COQ_VOS = $(COQ_SOURCES:.v=.vo)
 COQ_GLOBS = $(COQ_SOURCES:.v=.glob)
+
+# Verified extraction (requires Rocq 9.0.0 + rocq-verified-extraction)
+VERIFIED_EXTRACT_SOURCES = VerifiedExtraction.v
 
 # Extracted OCaml
 OCAML_FILES = DLX.ml DLX.mli LatinSquare.ml LatinSquare.mli SAT.ml SAT.mli
@@ -33,20 +64,69 @@ TEST_COMPREHENSIVE = test_comprehensive
 TEST_VERIFIED = test_latin_verified
 TEST_JNI = test_jni_interface
 
-.PHONY: all clean coq extract c verify test integration-test comprehensive-test verified-test jni-test all-tests
+.PHONY: all clean coq extract c verify test integration-test comprehensive-test \
+        verified-test jni-test all-tests check-switch check-switches specs \
+        verified-extract
 
-all: coq extract c
+# =============================================================================
+# Switch Verification
+# =============================================================================
+
+# Check main switch exists and has required packages
+check-switch:
+	@$(OPAM) switch show --switch=$(OPAM_SWITCH_MAIN) >/dev/null 2>&1 || \
+		(echo "ERROR: Switch $(OPAM_SWITCH_MAIN) not found. Create with:" && \
+		 echo "  opam switch create $(OPAM_SWITCH_MAIN) 5.4.0" && \
+		 echo "  opam install rocq-prover" && exit 1)
+	@$(OPAM) exec --switch=$(OPAM_SWITCH_MAIN) -- rocq --version | grep -q "9.1.0" || \
+		(echo "ERROR: Rocq 9.1.0 not found in $(OPAM_SWITCH_MAIN)" && exit 1)
+	@echo "Switch $(OPAM_SWITCH_MAIN) verified: Rocq 9.1.0"
+
+# Check verified extraction switch
+check-switch-verified:
+	@$(OPAM) switch show --switch=$(OPAM_SWITCH_VERIFIED) >/dev/null 2>&1 || \
+		(echo "ERROR: Switch $(OPAM_SWITCH_VERIFIED) not found." && exit 1)
+	@$(OPAM) exec --switch=$(OPAM_SWITCH_VERIFIED) -- rocq --version | grep -q "9.0.0" || \
+		(echo "WARNING: Rocq 9.0.0 expected in $(OPAM_SWITCH_VERIFIED)" && exit 1)
+	@echo "Switch $(OPAM_SWITCH_VERIFIED) verified: Rocq 9.0.0"
+
+check-switches: check-switch check-switch-verified
+	@echo "All switches verified"
+
+# =============================================================================
+# Main Targets
+# =============================================================================
+
+all: check-switch coq extract c
 
 # Compile Coq specifications
 coq: $(COQ_VOS)
 
 %.vo: %.v
-	$(COQC) $(COQFLAGS) $<
+	$(ROCQC) $(ROCQFLAGS) $<
 
+# =============================================================================
 # Dependencies
+# =============================================================================
+
+# Core type dependencies
+DSF.vo: SolverTypes.vo
+CageOps.vo: SolverTypes.vo
+Modes.vo: SolverTypes.vo
+
+# Latin square solver
 DLX.vo: LatinSquare.vo
 SAT.vo: LatinSquare.vo
+SolverSpec.vo: SolverTypes.vo DSF.vo CageOps.vo LatinSquare.vo
+GeneratorSpec.vo: SolverSpec.vo
+
+# Extraction
 Extraction.vo: LatinSquare.vo DLX.vo SAT.vo
+ExtractSolver.vo: SolverSpec.vo GeneratorSpec.vo
+
+# Specs-only target (no extraction)
+specs: check-switch $(SPEC_SOURCES:.v=.vo)
+	@echo "All specifications compiled"
 
 # Extract to OCaml
 extract: Extraction.vo
@@ -120,6 +200,27 @@ jni-test: $(TEST_JNI)
 all-tests: integration-test comprehensive-test verified-test jni-test
 	@echo "All test suites completed!"
 
+# =============================================================================
+# Verified Extraction (Rocq 9.0.0 + rocq-verified-extraction)
+# =============================================================================
+
+# Compile VerifiedExtraction.v using the verified extraction switch
+# This produces Malfunction IR files for verified compilation
+verified-extract: check-switch-verified
+	@echo "Running verified extraction with Rocq 9.0.0..."
+	$(ROCQC_VERIFIED) $(ROCQFLAGS) VerifiedExtraction.v
+	@echo "Verified extraction complete"
+	@ls -la extracted/*.mlf 2>/dev/null || echo "(No .mlf files yet)"
+
+# Compile Malfunction to native objects
+MALC = malfunction
+extracted/%.o: extracted/%.mlf
+	$(MALC) compile $< -o $@
+
+# =============================================================================
+# Cleanup
+# =============================================================================
+
 # Clean generated files
 clean:
 	rm -f $(COQ_VOS) $(COQ_GLOBS)
@@ -127,6 +228,16 @@ clean:
 	rm -f $(C_OBJECTS)
 	rm -f $(TEST_BIN) $(TEST_COMPREHENSIVE) $(TEST_VERIFIED) $(TEST_JNI)
 	rm -f .*.aux *.aux
+	rm -f VerifiedExtraction.vo VerifiedExtraction.glob
+
+clean-extracted:
+	rm -f extracted/*.ml extracted/*.mli extracted/*.mlf extracted/*.o
+
+clean-all: clean clean-extracted
+
+# =============================================================================
+# Statistics
+# =============================================================================
 
 # Show statistics
 stats:

@@ -163,18 +163,19 @@ Inductive SearchResult :=
   | NotFound : SearchResult.
 
 (** Search depth bound (for termination) *)
-Fixpoint search_bounded (m : DLXMatrix) (partial : Solution) (fuel : nat) : SearchResult :=
+(* Note: Simplified stub - full implementation would recurse on fuel *)
+Definition search_bounded (m : DLXMatrix) (partial : Solution) (fuel : nat) : SearchResult :=
   match fuel with
   | O => NotFound  (* Out of fuel *)
-  | S fuel' =>
+  | S _ =>
       match choose_column m with
       | None =>
           (* No columns left - we have a solution! *)
           Found (rev partial)
-      | Some c =>
-          (* Column c needs to be covered *)
-          (* Try each row in column c *)
-          NotFound  (* Simplified - full implementation would iterate rows *)
+      | Some _ =>
+          (* Column needs to be covered *)
+          (* Full implementation would iterate rows and recurse *)
+          NotFound  (* Simplified stub *)
       end
   end.
 
