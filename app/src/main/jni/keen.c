@@ -121,7 +121,7 @@ struct game_state {
     return ret;
 }
 
-const static struct game_params keen_presets[] = {
+static const struct game_params keen_presets[] = {
     {3, DIFF_EASY, false, MODE_STANDARD},         {4, DIFF_EASY, false, MODE_STANDARD},
     {5, DIFF_NORMAL, false, MODE_STANDARD},       {6, DIFF_NORMAL, false, MODE_STANDARD},
     {7, DIFF_HARD, false, MODE_STANDARD},         {8, DIFF_EXTREME, false, MODE_STANDARD},

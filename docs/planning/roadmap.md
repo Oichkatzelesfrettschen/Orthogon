@@ -2,6 +2,11 @@
 
 Target ISAs: `x86_64`, `arm64-v8a`, `armeabi-v7a` only. Warnings are errors.
 
+**Key References:**
+- [Grid Size & Difficulty Matrix](../GRID_SIZE_DIFFICULTY_MATRIX.md) - Comprehensive 2x2-16x16 analysis
+- [Solver Difficulty Standards](../SOLVER_DIFFICULTY_STANDARDS.md) - 7-level difficulty system
+- [Game Modes Architecture](../GAME_MODES_ARCHITECTURE.md) - Mode flags and implementations
+
 ## Phase 0: Flavor Architecture Baseline
 - [x] **Classik Baseline**: Shared implementations live in `app/src/main`.
 - [x] **Kenning Overrides**: Flavor-specific services in `app/src/kenning`.
@@ -9,7 +14,7 @@ Target ISAs: `x86_64`, `arm64-v8a`, `armeabi-v7a` only. Warnings are errors.
 - [x] **:kenning Module**: ML + narrative + story assets; wired via `kenningImplementation`.
 - [x] **Kenning Assets**: Stored in `kenning/src/main/assets`; app/src/kenning reserved for overrides.
 - [x] **Factory**: `FlavorServices` provides flavor implementations.
-- [ ] **Asset Consistency**: verify ONNX asset names used by generators match packaged assets.
+- [x] **Asset Consistency**: `latin_solver.onnx` deployed and verified (2026-01-01).
 
 ## Phase 1: Build & Test Stabilization
 - [x] **Build Check**: `./gradlew assembleClassikDebug assembleKenningDebug`.
@@ -17,7 +22,7 @@ Target ISAs: `x86_64`, `arm64-v8a`, `armeabi-v7a` only. Warnings are errors.
 - [x] **Instrumented Tests**: headless emulator + `connected*AndroidTest` (ensure package service ready).
 - [x] **Emulator Keepalive**: keepalive + logcat capture with timestamp window.
 - [x] **Runner Split**: UI tests default to `AndroidJUnitRunner`, benchmarks via `-PkeenBenchmark`.
-- [ ] **Lint**: `./gradlew lintClassikDebug lintKenningDebug`.
+- [x] **Lint**: Both flavors pass lint (2025-12-31).
 - [x] **Build Profiling**: configuration cache + build cache + parallel in `gradle.properties`.
 
 ## Phase 2: Performance Instrumentation
@@ -51,6 +56,17 @@ Target ISAs: `x86_64`, `arm64-v8a`, `armeabi-v7a` only. Warnings are errors.
 - [ ] **AI Parser**: Convert ONNX `float[]` logits to `int[]` grid in Java.
 - [ ] **Full Loop**: Connect AI -> Parser -> JNI -> Game.
 
-## Phase 7: Expansion (Future)
+## Phase 7: Grid Size & Difficulty Standardization (2026-01-01)
+- [x] **Grid Size Matrix**: Comprehensive documentation of 2x2-16x16 constraints.
+- [x] **3x3 Auto-Upgrade**: HARD+ auto-enables KILLER/BITWISE/MODULAR modes.
+- [x] **Extended Mode Limits**: Zero/Negative/Modular/Powers limited to 9x9.
+- [x] **2x2 Exclusion Documented**: Mathematical basis for excluding trivial size.
+- [ ] **DLX Integration**: Wire `dlx.c` into solver for exact cover (0% coverage).
+- [ ] **SAT Fallback**: Implement SAT solver for large cage enumeration.
+
+## Phase 8: Expansion (Future)
 - [ ] **Features**: Add more puzzle types or difficulty settings.
 - [ ] **UI Polish**: Material Design 3 updates.
+- [ ] **New Operations**: GCD, LCM, MOD (number theory mode).
+- [ ] **Android TV**: D-pad navigation with focus management.
+- [ ] **Hint System**: Step-by-step solving hints with technique explanations.

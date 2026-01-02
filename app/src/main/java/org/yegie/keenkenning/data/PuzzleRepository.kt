@@ -44,10 +44,8 @@ class PuzzleRepositoryImpl : PuzzleRepository {
         // Run on IO dispatcher
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val builder = org.yegie.keenkenning.KeenModelBuilder()
-            // Always compute ML probabilities for Smart Hints availability
-            // The 'useML' parameter now only affects tracking (isMlGenerated badge)
             // Pass game mode flags to C layer for mode-specific generation
-            val model = builder.build(context, size, diff, multOnly, seed, true, gameMode.cFlags)
+            val model = builder.build(context, size, diff, multOnly, seed, useAI, gameMode.cFlags)
 
             if (model != null) {
                 PuzzleResult.Success(model)

@@ -145,12 +145,12 @@ enum class GameMode(
         implemented = true  // Stub: no story content yet
     ),
 
-    // Visual Theme Mode
+    // Visual Theme Mode (UI-only, no native layer changes)
     RETRO_8BIT(
         displayName = "Standard 8-Bit",
         description = "Retro pixel art style with voxel buttons",
         iconName = "videogame_asset",
-        cFlags = 0x400,
+        cFlags = 0x0000,  // UI-only mode: same puzzle generation as STANDARD
         phase = 1,
         implemented = true,
         extendedTip = "Experience the puzzle in classic 8-bit style! " +
@@ -161,9 +161,10 @@ enum class GameMode(
     companion object {
         /**
          * Modes available in Classik (legacy Keen).
-         * Only Standard and Standard 8-Bit - the classic experience.
+         * Only Standard mode - the classic experience.
+         * RETRO_8BIT is Kenning-only (requires additional assets).
          */
-        private val CLASSIK_MODES = setOf(STANDARD, RETRO_8BIT)
+        private val CLASSIK_MODES = setOf(STANDARD)
 
         private fun flavorConfig(): FlavorConfig = FlavorConfigProvider.get()
 
@@ -287,5 +288,28 @@ enum class Difficulty(val level: Int, val displayName: String) {
 
         /** Maximum difficulty available for Kenning flavor (3x3-16x16 grids) */
         val KENNING_MAX = INCOMPREHENSIBLE
+
+        /**
+         * Maximum difficulty for 3x3 grids.
+         *
+         * Note: Due to automatic mode upgrade in keen_generate.c, 3x3 HARD+
+         * puzzles are now supported through constraint expansion:
+         *   - HARD: Auto-enables KILLER mode (no repeat digits in cages)
+         *   - EXTREME: Auto-enables KILLER + BITWISE (XOR operations)
+         *   - UNREASONABLE+: Auto-enables KILLER + BITWISE + MODULAR
+         *
+         * See: docs/SOLVER_DIFFICULTY_STANDARDS.md (Phase 2)
+         */
+        @Suppress("unused") // Retained for documentation purposes
+        val MAX_3X3_LEGACY = NORMAL
+
+        /**
+         * Get difficulties available for a given grid size.
+         *
+         * All difficulty levels are supported for all grid sizes.
+         * 3x3 HARD+ uses automatic mode upgrade (constraint expansion) to
+         * overcome the 12-Latin-square limitation.
+         */
+        fun forGridSize(gridSize: Int): List<Difficulty> = entries.toList()
     }
 }

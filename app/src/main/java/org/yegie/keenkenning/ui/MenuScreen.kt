@@ -63,6 +63,8 @@ fun MenuScreen(
     onStartGame: () -> Unit,
     onContinueGame: () -> Unit
 ) {
+    // All difficulties available for all grid sizes
+    // 3x3 HARD+ uses automatic mode upgrade (constraint expansion)
     val difficulties = Difficulty.entries.map { it.displayName }
 
     Box(

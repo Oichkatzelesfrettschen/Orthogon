@@ -14,6 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LOG_TAG "KEEN_GEN"
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#else
+#define LOGD(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
 /*
  * Helper functions for number theory operations.
  */
@@ -400,8 +408,42 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
     clue_t* clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
-    int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
-    (void)get_minblk(params->mode_flags); /* Reserved for future constraint validation */
+
+    /*
+     * AUTOMATIC MODE UPGRADE FOR SMALL GRIDS (Phase 2: Solver Difficulty Standards)
+     *
+     * 3x3 grids have only 12 essentially different Latin squares, which
+     * means HARD+ techniques (forcing chains, set exclusion) have nothing
+     * to operate on - the solver exhausts techniques and returns diff_unfinished.
+     *
+     * Solution: Automatically enable constraint-expanding modes that increase
+     * the search space complexity, making advanced techniques necessary:
+     *
+     *   3x3 + HARD     -> Enable KILLER (no repeated digits in cages)
+     *   3x3 + EXTREME  -> Enable KILLER + BITWISE (high ambiguity XOR)
+     *   3x3 + UNREASONABLE+ -> Enable KILLER + BITWISE + MODULAR
+     *
+     * This allows 3x3 puzzles to achieve higher difficulties through
+     * constraint expansion rather than Latin square complexity.
+     *
+     * See: docs/SOLVER_DIFFICULTY_STANDARDS.md
+     */
+    int mode_flags = params->mode_flags;
+    if (w == 3 && diff >= DIFF_HARD) {
+        mode_flags |= MODE_KILLER;
+        LOGD("3x3 HARD+ auto-upgrade: enabling KILLER mode");
+        if (diff >= DIFF_EXTREME) {
+            mode_flags |= MODE_BITWISE;
+            LOGD("3x3 EXTREME+ auto-upgrade: enabling BITWISE mode");
+        }
+        if (diff >= DIFF_UNREASONABLE) {
+            mode_flags |= MODE_MODULAR;
+            LOGD("3x3 UNREASONABLE+ auto-upgrade: enabling MODULAR mode");
+        }
+    }
+
+    int maxblk = get_maxblk_for_diff(mode_flags, diff);
+    (void)get_minblk(mode_flags); /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
@@ -430,6 +472,10 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
      * - HARD: 2x multiplier (naked/hidden sets less common)
      * - EXTREME: 4x multiplier (forcing chains rare)
      * - UNREASONABLE+: 8x multiplier (very rare puzzle structures)
+     *
+     * Key insight: NORMAL difficulty has a narrow target band (~15% of
+     * randomly generated puzzles hit it exactly). We add a 2x multiplier
+     * for NORMAL to ensure adequate retry budget without falling back.
      */
     int difficulty_multiplier = 1;
     if (diff >= DIFF_UNREASONABLE)
@@ -438,9 +484,19 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
         difficulty_multiplier = 4;
     else if (diff >= DIFF_HARD)
         difficulty_multiplier = 2;
+    else if (diff >= DIFF_NORMAL)
+        difficulty_multiplier = 2; /* NORMAL is a narrow target band */
 
-    int max_retries = (1000 + (a * 20)) * difficulty_multiplier;
+    /*
+     * Scale retries with grid area: larger grids need more attempts.
+     * For 9x9 (a=81): base + scaling gives ~5000+ attempts at NORMAL.
+     */
+    int size_multiplier = (w >= 9) ? 3 : (w >= 7) ? 2 : 1;
+    int max_retries = (1000 + (a * 20)) * difficulty_multiplier * size_multiplier;
     int attempts = 0;
+    int best_diff_achieved = -1;  /* Track closest difficulty found */
+
+    LOGD("new_game_desc: w=%d, diff=%d, max_retries=%d", w, diff, max_retries);
 
     while (attempts < max_retries) {
         attempts++;
@@ -576,7 +632,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
                 /* XOR works great on N-cell cages with MODE_BITWISE */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
+                if (HAS_MODE(mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
                 /* Fetch the two numbers and sort them into order. */
                 int p_val = grid[j], q = grid[i], v;
@@ -631,9 +687,9 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                  * Negative mode: disabled due to sign ambiguity in quotients.
                  * Modular mode: disabled (modular division is complex).
                  */
-                if (!HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_NEGATIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_MODULAR) && p_val % q == 0 &&
+                if (!HAS_MODE(mode_flags, MODE_ZERO_INCLUSIVE) &&
+                    !HAS_MODE(mode_flags, MODE_NEGATIVE) &&
+                    !HAS_MODE(mode_flags, MODE_MODULAR) && p_val % q == 0 &&
                     2 * (p_val / q) <= w)
                     singletons[j] |= F_DIV;
 
@@ -642,7 +698,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                  * is active. We use base^exp where result <= reasonable max.
                  * Only allow when q >= 2 to avoid trivial x^1 = x cases.
                  */
-                if (HAS_MODE(params->mode_flags, MODE_EXPONENT) && q >= 2) {
+                if (HAS_MODE(mode_flags, MODE_EXPONENT) && q >= 2) {
                     /* Check if p^q or q^p yields a reasonable clue value */
                     long exp_val = 1;
                     int valid = 1;
@@ -657,7 +713,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                  * Number theory operations: MOD, GCD, LCM
                  * Only available when MODE_NUMBER_THEORY is active.
                  */
-                if (HAS_MODE(params->mode_flags, MODE_NUMBER_THEORY)) {
+                if (HAS_MODE(mode_flags, MODE_NUMBER_THEORY)) {
                     /*
                      * Modulo: p % q (larger % smaller). Avoid trivial cases
                      * where remainder is 0 (that's just division info).
@@ -707,7 +763,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                  * For difficulty: XOR is ALWAYS preferred at Hard+ because
                  * it provides minimal constraint information.
                  */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
+                if (HAS_MODE(mode_flags, MODE_BITWISE)) {
                     v = p_val ^ q;
                     if (diff >= DIFF_HARD)
                         singletons[j] |= F_XOR; /* Always good at hard+ */
@@ -737,15 +793,22 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
 
         /*
          * Operation order arrays: different priorities for different difficulties.
-         * Easy/Normal: Prefer constraining ops (DIV, EXP) for simpler puzzles.
-         * Hard+: Prefer ambiguous ops (XOR, GCD, ADD, LCM) for harder puzzles.
          * Index mapping: 0=DIV, 1=SUB, 2=MUL, 3=ADD, 4=EXP, 5=MOD, 6=GCD, 7=LCM, 8=XOR
+         *
+         * EASY: Prefer constraining ops (DIV first) for simple puzzles.
+         * NORMAL: Prefer MUL first - creates moderate ambiguity that requires
+         *         pointing pairs/box-line reduction but not naked/hidden sets.
+         * HARD+: Prefer ambiguous ops (XOR, GCD, ADD) for complex puzzles.
          */
         static const int op_order_easy[9] = {0, 1, 2, 3, 4,
-                                             5, 6, 7, 8}; /* DIV...LCM,XOR (XOR last) */
+                                             5, 6, 7, 8}; /* DIV,SUB,MUL,ADD,EXP,MOD,GCD,LCM,XOR */
+        static const int op_order_normal[9] = {2, 3, 1, 0, 5,
+                                               4, 6, 7, 8}; /* MUL,ADD,SUB,DIV,MOD,EXP,GCD,LCM,XOR */
         static const int op_order_hard[9] = {8, 6, 3, 7, 5,
                                              1, 2, 0, 4}; /* XOR,GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
-        const int* op_order = (diff >= DIFF_HARD) ? op_order_hard : op_order_easy;
+        const int* op_order = (diff >= DIFF_HARD) ? op_order_hard
+                            : (diff >= DIFF_NORMAL) ? op_order_normal
+                            : op_order_easy;
 
         while (1) {
             int done_something = false;
@@ -924,7 +987,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
          */
         if (diff > 0) {
             memset(soln, 0, (size_t)a * sizeof(digit));
-            ret = keen_solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+            ret = keen_solver(w, dsf, clues, soln, diff - 1, mode_flags);
             if (ret <= diff - 1) {
                 /*
                  * Puzzle is too easy - try cage merging to increase difficulty.
@@ -932,7 +995,11 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                  * interactions, often requiring more advanced techniques.
                  */
                 int merge_attempts = 0;
-                int max_merges = w * 2; /* Limit merge iterations */
+                /*
+                 * Merge budget scales with grid size: larger grids need
+                 * more merge attempts to elevate difficulty reliably.
+                 */
+                int max_merges = (w >= 9) ? w * 4 : w * 2;
 
                 while (merge_attempts < max_merges && ret <= diff - 1) {
                     if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
@@ -942,14 +1009,32 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
 
                     /* Re-test difficulty after merge */
                     memset(soln, 0, (size_t)a * sizeof(digit));
-                    ret = keen_solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+                    ret = keen_solver(w, dsf, clues, soln, diff - 1, mode_flags);
                 }
 
                 if (ret <= diff - 1) continue; /* Still too easy after merging - new attempt */
             }
         }
         memset(soln, 0, (size_t)a * sizeof(digit));
-        ret = keen_solver(w, dsf, clues, soln, diff, params->mode_flags);
+        ret = keen_solver(w, dsf, clues, soln, diff, mode_flags);
+        if (attempts <= 5) {
+            LOGD("Attempt %d: solver returned %d (wanted %d), modeFlags=0x%x",
+                 attempts, ret, diff, mode_flags);
+            /* Log first few clues to diagnose solver issues */
+            if (attempts == 1) {
+                for (int dbg_i = 0; dbg_i < a && dbg_i < 9; dbg_i++) {
+                    int canon = dsf_canonify(dsf, dbg_i);
+                    if (canon == dbg_i) {
+                        int cage_size = dsf_size(dsf, dbg_i);
+                        LOGD("  Clue[%d]: op=0x%llx val=%llu size=%d (full=0x%llx)",
+                             dbg_i, (unsigned long long)(clues[dbg_i] & CMASK),
+                             (unsigned long long)(clues[dbg_i] & ~CMASK),
+                             cage_size,
+                             (unsigned long long)clues[dbg_i]);
+                    }
+                }
+            }
+        }
         if (ret != diff) {
             /*
              * Puzzle doesn't match target difficulty - try merging.
@@ -959,7 +1044,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
             if (ret < diff) {
                 /* Too easy - merge cages to increase difficulty */
                 int merge_attempts = 0;
-                int max_merges = w * 2;
+                int max_merges = (w >= 9) ? w * 4 : w * 2;
 
                 while (merge_attempts < max_merges && ret < diff) {
                     if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
@@ -967,24 +1052,40 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
                     }
                     merge_attempts++;
                     memset(soln, 0, (size_t)a * sizeof(digit));
-                    ret = keen_solver(w, dsf, clues, soln, diff, params->mode_flags);
+                    ret = keen_solver(w, dsf, clues, soln, diff, mode_flags);
                 }
             }
 
-            if (ret != diff) continue; /* go round again */
+            if (ret != diff) {
+                /* Track closest difficulty achieved for fallback */
+                if (ret > best_diff_achieved) best_diff_achieved = ret;
+                continue; /* go round again */
+            }
         }
 
         /*
          * We've got a usable puzzle!
          */
+        best_diff_achieved = diff; /* Exact match */
         break;
     }
 
     /*
-     * Check if we exhausted retries without finding a valid puzzle.
-     * No fallback - user expects the exact difficulty they selected.
+     * NO FALLBACK TO DIFFERENT DIFFICULTY.
+     *
+     * If we exhausted retries without finding the exact requested difficulty,
+     * return nullptr. The UI must handle this gracefully (show error, suggest
+     * different settings) rather than silently substituting a different puzzle.
+     *
+     * Users expect to get what they ask for. An orange should not become an apple.
+     *
+     * With improved retry budget (2x for NORMAL), operation ordering (MUL first
+     * for NORMAL), and merge budget (4x for 9x9), we should hit NORMAL much more
+     * reliably. If we still can't after all that, the puzzle constraints may be
+     * fundamentally incompatible with the requested difficulty.
      */
     if (attempts >= max_retries) {
+        LOGD("FAILED: %d attempts, wanted diff=%d, best achieved=%d", attempts, diff, best_diff_achieved);
         sfree(grid);
         sfree(order);
         sfree(revorder);
@@ -993,7 +1094,7 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
         sfree(clues);
         sfree(cluevals);
         sfree(soln);
-        return nullptr;
+        return nullptr; /* Let UI handle - no silent substitution */
     }
 
     /*
@@ -1064,9 +1165,9 @@ char* new_game_desc(const game_params* params, random_state* rs, char** aux, int
         int display_val = soln[i];
         
         /* Apply mode-specific display transformations */
-        if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
+        if (HAS_MODE(mode_flags, MODE_ZERO_INCLUSIVE)) {
             display_val -= 1; /* 1..N -> 0..N-1 */
-        } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
+        } else if (HAS_MODE(mode_flags, MODE_NEGATIVE)) {
             int range = w;
             int half = range / 2;
             /* 1..N -> -half..+(range-half-1) */
@@ -1105,8 +1206,27 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
     clue_t* clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
-    int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
-    (void)get_minblk(params->mode_flags); /* Reserved for future constraint validation */
+
+    /*
+     * AUTOMATIC MODE UPGRADE FOR SMALL GRIDS (Phase 2: Solver Difficulty Standards)
+     * Same logic as new_game_desc - see that function for full documentation.
+     */
+    int mode_flags = params->mode_flags;
+    if (w == 3 && diff >= DIFF_HARD) {
+        mode_flags |= MODE_KILLER;
+        LOGD("3x3 HARD+ auto-upgrade (AI path): enabling KILLER mode");
+        if (diff >= DIFF_EXTREME) {
+            mode_flags |= MODE_BITWISE;
+            LOGD("3x3 EXTREME+ auto-upgrade (AI path): enabling BITWISE mode");
+        }
+        if (diff >= DIFF_UNREASONABLE) {
+            mode_flags |= MODE_MODULAR;
+            LOGD("3x3 UNREASONABLE+ auto-upgrade (AI path): enabling MODULAR mode");
+        }
+    }
+
+    int maxblk = get_maxblk_for_diff(mode_flags, diff);
+    (void)get_minblk(mode_flags); /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
@@ -1258,7 +1378,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
                 /* XOR works great on N-cell cages with MODE_BITWISE */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
+                if (HAS_MODE(mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
                 int p_val = grid[j], q = grid[i], v;
                 if (p_val < q) {
@@ -1286,14 +1406,14 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
                 if (v < w - 1) singletons[j] |= F_SUB;
 
                 /* Division: disabled in Zero-Inclusive, Negative, and Modular modes */
-                if (!HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_NEGATIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_MODULAR) && p_val % q == 0 &&
+                if (!HAS_MODE(mode_flags, MODE_ZERO_INCLUSIVE) &&
+                    !HAS_MODE(mode_flags, MODE_NEGATIVE) &&
+                    !HAS_MODE(mode_flags, MODE_MODULAR) && p_val % q == 0 &&
                     2 * (p_val / q) <= w)
                     singletons[j] |= F_DIV;
 
                 /* Exponentiation: only when mode is enabled */
-                if (HAS_MODE(params->mode_flags, MODE_EXPONENT) && q >= 2) {
+                if (HAS_MODE(mode_flags, MODE_EXPONENT) && q >= 2) {
                     long exp_val = 1;
                     int valid = 1;
                     int e;
@@ -1305,7 +1425,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
                 }
 
                 /* Number Theory operations: only when mode is enabled */
-                if (HAS_MODE(params->mode_flags, MODE_NUMBER_THEORY)) {
+                if (HAS_MODE(mode_flags, MODE_NUMBER_THEORY)) {
                     /* Modulo: larger % smaller, only if result is non-zero */
                     v = p_val % q;
                     if (v > 0 && v < w) singletons[j] |= F_MOD;
@@ -1321,7 +1441,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
                 }
 
                 /* XOR: available when MODE_BITWISE is active */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
+                if (HAS_MODE(mode_flags, MODE_BITWISE)) {
                     v = p_val ^ q;
                     if (diff >= DIFF_HARD)
                         singletons[j] |= F_XOR; /* Always good at hard+ */
@@ -1497,7 +1617,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
          */
         if (diff > 0) {
             memset(soln, 0, (size_t)a * sizeof(digit));
-            ret = keen_solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+            ret = keen_solver(w, dsf, clues, soln, diff - 1, mode_flags);
             if (ret <= diff - 1) {
                 /* Too easy - try cage merging */
                 int merge_attempts = 0;
@@ -1509,14 +1629,14 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
                     }
                     merge_attempts++;
                     memset(soln, 0, (size_t)a * sizeof(digit));
-                    ret = keen_solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
+                    ret = keen_solver(w, dsf, clues, soln, diff - 1, mode_flags);
                 }
 
                 if (ret <= diff - 1) continue;
             }
         }
         memset(soln, 0, (size_t)a * sizeof(digit));
-        ret = keen_solver(w, dsf, clues, soln, diff, params->mode_flags);
+        ret = keen_solver(w, dsf, clues, soln, diff, mode_flags);
         if (ret != diff) {
             if (ret < diff) {
                 /* Too easy - merge cages */
@@ -1529,7 +1649,7 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
                     }
                     merge_attempts++;
                     memset(soln, 0, (size_t)a * sizeof(digit));
-                    ret = keen_solver(w, dsf, clues, soln, diff, params->mode_flags);
+                    ret = keen_solver(w, dsf, clues, soln, diff, mode_flags);
                 }
             }
 
@@ -1633,9 +1753,9 @@ char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit
     for (i = 0; i < a; i++) {
         int display_val = soln[i];
 
-        if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
+        if (HAS_MODE(mode_flags, MODE_ZERO_INCLUSIVE)) {
             display_val -= 1; /* 1..N -> 0..N-1 */
-        } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
+        } else if (HAS_MODE(mode_flags, MODE_NEGATIVE)) {
             int range = w;
             int half = range / 2;
             display_val -= (half + 1);

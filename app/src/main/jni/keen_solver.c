@@ -356,8 +356,7 @@ static int solver_common(struct latin_solver* solver, void* vctx, int diff) {
 
                                 for (j = ctx->dscratch[i] + 1; j <= w; j++) {
 
-                                    if (op == C_ADD ? (total < j) : ((long)((unsigned long)total % (unsigned long)value) != 0))
-
+                                    if (op == C_ADD ? (total < j) : (total % j != 0))
                                         continue; /* this one won't fit */
 
                                     if (!solver->cube[sq[i] * w + j - 1])

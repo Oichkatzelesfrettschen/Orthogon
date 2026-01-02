@@ -26,6 +26,12 @@ Package: `org.yegie.keenkenning` (with `.classik` or `.kenning` suffix per flavo
   - Data classes for models.
   - Sealed classes for state.
   - `allWarningsAsErrors = true` is enabled.
+- **Rocq/Coq:**
+  - **Version:** Rocq 9.1.0 (Coq-compatible prover)
+  - **Compliance:** Warnings as errors (`-w +default` in Makefile)
+  - **Deprecated syntax:** Always update to latest Stdlib conventions
+  - **Proofs:** Must complete with `Qed`, not `Admitted`
+  - **Build:** `make` in `formal/` directory
 - **C/C++:**
   - **Standard:** ISO/IEC 9899:2023 (C23) and ISO/IEC 14882:2023 (C++23).
   - **Compliance:** Strict "Warnings as Errors" (`-Werror -Wall -Wextra`).
@@ -139,6 +145,47 @@ Model outputs to `scripts/ai/latin_solver.onnx`, deployed to `app/src/kenning/as
 
 Training script: `scripts/ai/train_autoregressive.py` (6.4M parameter transformer with curriculum learning)
 
+## Formal Verification
+
+Located in `formal/`:
+
+```bash
+# Build all Rocq proofs
+cd formal && make
+
+# Clean and rebuild
+cd formal && make clean && make
+
+# Check specific module
+cd formal && rocq compile SolverTypes.v
+```
+
+**Verified Modules** (Rocq 9.1.0):
+
+| Module | Status | Proven | Admitted | Description |
+|--------|--------|--------|----------|-------------|
+| SolverTypes.v | Phase 1 Done | 6 | 1 | Core types + latin soundness |
+| DSF.v | Partial | 8 | 3 | Disjoint Set Forest (Union-Find) |
+| CageOps.v | Phase 1 Done | 17 | 0 | Cage operation evaluation |
+| DLX.v | Complete | 2 | 0 | Dancing Links exact cover |
+| SAT.v | Complete | 1 | 0 | CNF encoding |
+| LatinSquare.v | Complete | 2 | 2 | Latin square constraints |
+
+**Key Proven Theorems**:
+- `latin_constraint_sound` - Valid Latin grid cells contain valid digits
+- `canonify_is_root` - DSF canonify returns root elements
+- `cage_satisfiedb_reflect` - Boolean/Prop equivalence for cage satisfaction
+- `dsf_init_wf` - Initial DSF is well-formed
+- `dsf_equiv_refl/sym/trans` - DSF equivalence is an equivalence relation
+
+**Extraction Strategy**:
+- Current: Standard OCaml extraction + hand-written C bridge
+- Future: rocq-verified-extraction for reduced TCB (Phase 2)
+- C bridge: `formal/keen_verified.c` (~2500 LOC)
+- JNI integration: `formal/keen_verified_jni.c`
+
+See `formal/PHASE_PLAN_UPDATED.md` for detailed verification roadmap.
+
 ## Native Development
 
 **Source files**: `app/src/main/jni/`
@@ -200,3 +247,5 @@ Triggered on push to main and PRs touching `app/src/main/jni/**`.
 - @docs/SYNTHESIS_REPORT.md - Build harmonization
 - @docs/GAME_MODES_ARCHITECTURE.md - Mode implementation details
 - @scripts/ai/README.md - ML pipeline documentation
+- @formal/PHASE_PLAN_UPDATED.md - Formal verification roadmap
+- @formal/EXTRACTION_COMPARISON.md - Extraction strategy analysis
