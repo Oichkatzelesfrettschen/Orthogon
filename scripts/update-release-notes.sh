@@ -4,9 +4,12 @@
 
 set -e
 
+# Determine repository root (parent of this script's directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 TAG="v1.0-classik-arm64-release"
 REPO="Oichkatzelesfrettschen/KeenKenning"
-NOTES_FILE="RELEASE_NOTES_v1.0-classik-arm64.md"
+NOTES_FILE="$SCRIPT_DIR/RELEASE_NOTES_v1.0-classik-arm64.md"
 
 # Check if gh CLI is installed
 if ! command -v gh &> /dev/null; then
