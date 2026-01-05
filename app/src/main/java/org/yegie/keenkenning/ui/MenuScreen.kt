@@ -98,7 +98,7 @@ fun MenuScreen(
             )
 
             Text(
-                text = "Classic Logic Puzzle",
+                text = "Keen Classik - Traditional KenKen Puzzles",
                 fontSize = 14.sp,
                 color = Color(0xFF888888),
                 letterSpacing = 2.sp
