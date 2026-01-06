@@ -18,8 +18,12 @@ enum class ColorblindMode(val displayName: String, val description: String) {
     DEUTERANOPIA("Deuteranopia", "Green-blind friendly"),
     PROTANOPIA("Protanopia", "Red-blind friendly"),
     TRITANOPIA("Tritanopia", "Blue-blind friendly"),
+    TETARTANOPIA("Tetartanopia", "Hypothetical fourth cone deficiency"),
+    ACHROMATOPSIA("Achromatopsia", "Monochrome high-luminance"),
     HIGH_CONTRAST("High Contrast", "Maximum visibility")
 }
+
+enum class LayoutPreset { Compact, Medium, Spacious }
 
 data class GameUiState(
     val size: Int = 0,
@@ -47,6 +51,7 @@ data class GameUiState(
     val immersiveMode: Boolean = false,  // Full-screen immersive (auto-hide UI)
     val uiVisible: Boolean = true,  // TopBar/BottomBar visibility state
     val colorblindMode: ColorblindMode = ColorblindMode.NORMAL,  // Accessibility: colorblind support
+    val layoutPreset: LayoutPreset = LayoutPreset.Medium,  // Grid vs controls balance
     // Save/Load
     val showSaveDialog: Boolean = false,
     val showLoadDialog: Boolean = false,

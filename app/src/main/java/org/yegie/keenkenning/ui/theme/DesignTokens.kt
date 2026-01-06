@@ -79,6 +79,21 @@ object Typography {
         lineHeight = 12.sp
     )
 
+    // Note typography for user notes/hints
+    val noteTextSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,  // Increased from Normal for better visibility
+        fontSize = 9.sp,
+        lineHeight = 11.sp
+    )
+
+    val noteTextMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 10.sp,
+        lineHeight = 12.sp
+    )
+
     // For cage operations (e.g., "12+")
     val cageOperation = TextStyle(
         fontFamily = FontFamily.SansSerif,

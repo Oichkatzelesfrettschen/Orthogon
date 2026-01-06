@@ -88,7 +88,10 @@ data class RenderableCell(
     val borders: CageBorders,
 
     /** Whether this is the zone's anchor cell (shows clue label) */
-    val isZoneAnchor: Boolean
+    val isZoneAnchor: Boolean,
+
+    /** Position of clue within this cell (for layout optimization) */
+    val cluePosition: CluePosition = CluePosition.NONE
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -98,7 +101,8 @@ data class RenderableCell(
             pencilMarks == other.pencilMarks &&
             zoneId == other.zoneId &&
             borders == other.borders &&
-            isZoneAnchor == other.isZoneAnchor
+            isZoneAnchor == other.isZoneAnchor &&
+            cluePosition == other.cluePosition
     }
 
     override fun hashCode(): Int = 31 * x + y
@@ -153,6 +157,32 @@ enum class ZoneOperation {
     LCM,
     XOR,
     SINGLE  // Single-cell zones (no operation)
+}
+
+/**
+ * Clue position within a cell.
+ *
+ * Tracks which quadrant/edge the clue occupies to enable
+ * intelligent positioning of notes and values that avoid overlap.
+ */
+enum class CluePosition {
+    /** Clue in top-left quadrant (most common) */
+    TOP_LEFT,
+
+    /** Clue in top-right quadrant */
+    TOP_RIGHT,
+
+    /** Clue in bottom-left quadrant */
+    BOTTOM_LEFT,
+
+    /** Clue in bottom-right quadrant */
+    BOTTOM_RIGHT,
+
+    /** Clue centered (rare, for single-cell zones) */
+    CENTER,
+
+    /** No clue in this cell */
+    NONE
 }
 
 /**
@@ -301,7 +331,8 @@ object GameStateTransformer {
                     zoneId = zone?.code ?: 0,
                     mlProbabilities = cell?.mlProbabilities,
                     borders = borders,
-                    isZoneAnchor = isAnchor
+                    isZoneAnchor = isAnchor,
+                    cluePosition = detectCluePosition(borders, isAnchor)
                 )
             }
         }
@@ -346,6 +377,43 @@ object GameStateTransformer {
         }
 
         return true
+    }
+
+    /**
+     * Detect clue position within a cell based on zone geometry.
+     *
+     * Analyzes cage borders to determine which quadrant the clue
+     * occupies, enabling intelligent layout of notes and values.
+     */
+    private fun detectCluePosition(
+        borders: CageBorders,
+        isAnchor: Boolean
+    ): CluePosition {
+        if (!isAnchor) return CluePosition.NONE
+
+        // Analyze border pattern to infer clue position
+        // Clues typically appear in corners with cage boundaries
+
+        return when {
+            // Top-left: most common (top and left are boundaries)
+            borders.top && borders.left -> CluePosition.TOP_LEFT
+
+            // Top-right: top and right are boundaries
+            borders.top && borders.right -> CluePosition.TOP_RIGHT
+
+            // Bottom-left: bottom and left are boundaries
+            borders.bottom && borders.left -> CluePosition.BOTTOM_LEFT
+
+            // Bottom-right: bottom and right are boundaries
+            borders.bottom && borders.right -> CluePosition.BOTTOM_RIGHT
+
+            // Center: likely single-cell zone (all borders present)
+            borders.top && borders.bottom && borders.left && borders.right ->
+                CluePosition.CENTER
+
+            // Fallback to top-left (standard position)
+            else -> CluePosition.TOP_LEFT
+        }
     }
 }
 

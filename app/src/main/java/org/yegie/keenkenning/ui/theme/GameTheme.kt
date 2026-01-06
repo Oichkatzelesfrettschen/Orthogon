@@ -30,36 +30,51 @@ import androidx.compose.ui.unit.sp
 // Zone colors designed to be distinguishable for all color vision types
 // Using varied luminance + hue to ensure separation even in grayscale
 object ZoneColors {
-    // Colorblind-safe palette with high luminance variance
-    // Tested with deuteranopia, protanopia, and tritanopia simulations
-    val zone1 = Color(0xFFE8F4F8)  // Light cyan - luminance ~95%
-    val zone2 = Color(0xFFFFF3E0)  // Light orange - luminance ~95%
-    val zone3 = Color(0xFFE8EAF6)  // Light indigo - luminance ~92%
-    val zone4 = Color(0xFFF3E5F5)  // Light purple - luminance ~92%
-    val zone5 = Color(0xFFE0F2F1)  // Light teal - luminance ~94%
-    val zone6 = Color(0xFFFCE4EC)  // Light pink - luminance ~93%
-    val zone7 = Color(0xFFFFF8E1)  // Light amber - luminance ~97%
-    val zone8 = Color(0xFFE3F2FD)  // Light blue - luminance ~95%
-    val zone9 = Color(0xFFEFEBE9)  // Light brown - luminance ~93%
+    // Baseline palette (WCAG-considered, varied luminance)
+    private val base = listOf(
+        Color(0xFFE8F4F8), Color(0xFFFFF3E0), Color(0xFFE8EAF6), Color(0xFFF3E5F5),
+        Color(0xFFE0F2F1), Color(0xFFFCE4EC), Color(0xFFFFF8E1), Color(0xFFE3F2FD), Color(0xFFEFEBE9)
+    )
+    private val high = listOf(
+        Color(0xFFB2EBF2), Color(0xFFFFCC80), Color(0xFFC5CAE9), Color(0xFFCE93D8),
+        Color(0xFF80CBC4), Color(0xFFF48FB1), Color(0xFFFFE082), Color(0xFF90CAF9), Color(0xFFBCAAA4)
+    )
 
-    // High contrast alternatives for accessibility mode
-    val zone1HighContrast = Color(0xFFB2EBF2)
-    val zone2HighContrast = Color(0xFFFFCC80)
-    val zone3HighContrast = Color(0xFFC5CAE9)
-    val zone4HighContrast = Color(0xFFCE93D8)
-    val zone5HighContrast = Color(0xFF80CBC4)
-    val zone6HighContrast = Color(0xFFF48FB1)
-    val zone7HighContrast = Color(0xFFFFE082)
-    val zone8HighContrast = Color(0xFF90CAF9)
-    val zone9HighContrast = Color(0xFFBCAAA4)
+    // Colorblind palettes synthesized to preserve luminance ordering and reduce confusions
+    private val deuteranopia = listOf(
+        Color(0xFFE8F4F8), Color(0xFFFFF3E0), Color(0xFFE8EAF6), Color(0xFFF3E5F5),
+        Color(0xFFE0F2F1), Color(0xFFFDEFEF), Color(0xFFFFFAE6), Color(0xFFE6F0FB), Color(0xFFF0EEEC)
+    )
+    private val protanopia = listOf(
+        Color(0xFFE6F6FA), Color(0xFFFFF5E6), Color(0xFFE9ECF7), Color(0xFFF2E6F7),
+        Color(0xFFDFF3F1), Color(0xFFF8E7EE), Color(0xFFFFF9E3), Color(0xFFE4F1FC), Color(0xFFEEECEA)
+    )
+    private val tritanopia = listOf(
+        Color(0xFFF0F5E8), Color(0xFFFFF3E0), Color(0xFFEDE9E0), Color(0xFFF3E5F5),
+        Color(0xFFE0EFEF), Color(0xFFFDEDEA), Color(0xFFFFF8E1), Color(0xFFEAEAEA), Color(0xFFEFE7E4)
+    )
+    private val tetartanopia = listOf(
+        // Hypothetical fourth cone deficiency approximation: reduce blue/yellow confusions
+        Color(0xFFEDEFEF), Color(0xFFFFF3E0), Color(0xFFE8EAF0), Color(0xFFF2E6F0),
+        Color(0xFFE0F0EE), Color(0xFFF8E8EE), Color(0xFFFFF8E6), Color(0xFFE6EEF4), Color(0xFFEEECE9)
+    )
+    private val achromatopsia = listOf(
+        // Grayscale with varied luminance; WCAG-compliant contrasts
+        Color(0xFFF5F5F5), Color(0xFFEDEDED), Color(0xFFE6E6E6), Color(0xFFDDDDDD),
+        Color(0xFFD5D5D5), Color(0xFFCDCDCD), Color(0xFFC5C5C5), Color(0xFFBDBDBD), Color(0xFFB5B5B5)
+    )
 
-    fun forZone(zoneId: Int, highContrast: Boolean = false): Color {
-        val colors = if (highContrast) {
-            listOf(zone1HighContrast, zone2HighContrast, zone3HighContrast,
-                   zone4HighContrast, zone5HighContrast, zone6HighContrast,
-                   zone7HighContrast, zone8HighContrast, zone9HighContrast)
-        } else {
-            listOf(zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8, zone9)
+    enum class Palette { BASE, HIGH, DEUTERANOPIA, PROTANOPIA, TRITANOPIA, TETARTANOPIA, ACHROMATOPSIA }
+
+    fun forZone(zoneId: Int, highContrast: Boolean = false, palette: Palette = Palette.BASE): Color {
+        val colors = when {
+            highContrast -> high
+            palette == Palette.DEUTERANOPIA -> deuteranopia
+            palette == Palette.PROTANOPIA -> protanopia
+            palette == Palette.TRITANOPIA -> tritanopia
+            palette == Palette.TETARTANOPIA -> tetartanopia
+            palette == Palette.ACHROMATOPSIA -> achromatopsia
+            else -> base
         }
         return colors[zoneId % colors.size]
     }
@@ -193,6 +208,29 @@ val LargeGameDimensions = GameDimensions(
     noteGridOffsetRatio = 0.12f,
     hintGridOffsetRatio = 0.15f
 )
+
+// Extension function for responsive button sizing
+fun GameDimensions.getResponsiveButtonSize(
+    puzzleSize: Int,
+    screenWidth: Dp
+): Dp {
+    // Determine max buttons per row based on puzzle size
+    val maxButtonsPerRow = when {
+        puzzleSize <= 5 -> puzzleSize
+        else -> 5
+    }
+
+    // Calculate available width
+    val totalSpacing = controlSpacing * (maxButtonsPerRow - 1)
+    val horizontalPadding = gridPadding * 2
+    val availableWidth = screenWidth - totalSpacing - horizontalPadding
+
+    // Calculate size that fits in available space
+    val calculatedSize = availableWidth / maxButtonsPerRow
+
+    // Constrain to WCAG minimum (44dp) and maximum (buttonMinSize)
+    return calculatedSize.coerceIn(44.dp, buttonMinSize)
+}
 
 // Accessibility settings
 data class AccessibilitySettings(

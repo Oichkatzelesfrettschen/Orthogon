@@ -384,6 +384,10 @@ class GameViewModel : ViewModel() {
     fun toggleSmartHints() {
         _uiState.update { it.copy(showSmartHints = !it.showSmartHints) }
     }
+
+    fun setLayoutPreset(preset: LayoutPreset) {
+        _uiState.update { it.copy(layoutPreset = preset) }
+    }
     
     fun toggleInfoDialog() {
         _uiState.update { it.copy(showInfoDialog = !it.showInfoDialog) }

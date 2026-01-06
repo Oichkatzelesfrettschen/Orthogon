@@ -20,6 +20,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,6 +70,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -120,6 +122,7 @@ private fun valueToDisplay(value: Int): String {
 fun Color.forColorblindMode(mode: ColorblindMode): Color {
     return when (mode) {
         ColorblindMode.NORMAL -> this
+        ColorblindMode.HIGH_CONTRAST -> this
         ColorblindMode.DEUTERANOPIA -> {
             // Green-blind: shift greens toward blue, increase blue/yellow contrast
             val r = red * 0.625f + green * 0.375f
@@ -141,17 +144,10 @@ fun Color.forColorblindMode(mode: ColorblindMode): Color {
             val b = green * 0.475f + blue * 0.525f
             Color(r.coerceIn(0f, 1f), g.coerceIn(0f, 1f), b.coerceIn(0f, 1f), alpha)
         }
-        ColorblindMode.HIGH_CONTRAST -> {
-            // Maximum visibility: boost saturation and use stark black/white backgrounds
+        ColorblindMode.TETARTANOPIA -> this
+        ColorblindMode.ACHROMATOPSIA -> {
             val luminance = 0.299f * red + 0.587f * green + 0.114f * blue
-            if (luminance > 0.5f) {
-                Color.White
-            } else {
-                // Boost saturation for colored elements
-                val avg = (red + green + blue) / 3f
-                val boosted = { c: Float -> ((c - avg) * 1.5f + avg).coerceIn(0f, 1f) }
-                Color(boosted(red), boosted(green), boosted(blue), alpha)
-            }
+            Color(luminance, luminance, luminance, alpha)
         }
     }
 }
@@ -178,6 +174,7 @@ fun GameScreen(
     val screenWidth = with(density) { screenWidthPx.toDp() }
     val screenHeight = with(density) { screenHeightPx.toDp() }
     val isLargeScreen = screenWidth > 600.dp
+    val isLandscape = screenWidth > screenHeight
 
     // Request focus on launch for keyboard input
     LaunchedEffect(Unit) {
@@ -240,7 +237,8 @@ fun GameScreen(
                     screenWidth = screenWidth,
                     screenHeight = screenHeight,
                     puzzleSize = uiState.size,
-                    isLargeScreen = isLargeScreen
+                    isLargeScreen = isLargeScreen,
+                    preset = uiState.layoutPreset
                 )
                 val cellSizePx = with(density) { (gridSize / uiState.size).toPx() }
                 val gridOffsetX = (screenWidthPx - with(density) { gridSize.toPx() }) / 2
@@ -276,6 +274,7 @@ fun GameScreen(
                             onToggleHints = { viewModel.toggleSmartHints() },
                             onShowInfo = { viewModel.toggleInfoDialog() },
                             onShowSettings = { viewModel.toggleSettingsDialog() },
+                            onSetLayoutPreset = { viewModel.setLayoutPreset(it) },
                             onMenuClick = onMenuClick,
                             gridSize = uiState.size,
                             difficultyName = uiState.difficultyName,
@@ -299,32 +298,95 @@ fun GameScreen(
                             screenWidth = screenWidth,
                             screenHeight = screenHeight,
                             puzzleSize = uiState.size,
-                            isLargeScreen = isLargeScreen
+                            isLargeScreen = isLargeScreen,
+                            preset = uiState.layoutPreset
                         )
 
-                        // Enable pinch-to-zoom only for grids 7x7 and larger
-                        val enableZoom = uiState.size >= 7
+                        var scale by remember { mutableFloatStateOf(1f) }
 
-                        if (enableZoom) {
-                            ZoomableGameGrid(
-                                state = uiState,
-                                gridSize = gridSize,
-                                isTv = isTv,
-                                onCellClick = { x, y ->
-                                    viewModel.onCellClicked(x, y)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        if (isLandscape) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    ZoomableGameGrid(
+                                        state = uiState,
+                                        gridSize = gridSize,
+                                        scale = scale,
+                                        onScaleChange = { scale = it },
+                                        isTv = isTv,
+                                        onCellClick = { x, y ->
+                                            viewModel.onCellClicked(x, y)
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    )
                                 }
-                            )
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    AccessibleInputPad(
+                                        size = uiState.size,
+                                        isNoteMode = uiState.isInputtingNotes,
+                                        screenWidth = screenWidth,
+                                        isZeroInclusive = uiState.gameMode == org.yegie.keenkenning.data.GameMode.ZERO_INCLUSIVE,
+                                        isNegativeMode = uiState.gameMode == org.yegie.keenkenning.data.GameMode.NEGATIVE_NUMBERS,
+                                        showHintButton = uiState.gameMode == org.yegie.keenkenning.data.GameMode.HINT_MODE,
+                                        onNumberClick = {
+                                            viewModel.onInput(it)
+                                            viewModel.onUserInteraction()
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        },
+                                        onUndoClick = {
+                                            viewModel.onUndo()
+                                            viewModel.onUserInteraction()
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        },
+                                        onNoteToggle = {
+                                            viewModel.toggleNoteMode()
+                                            viewModel.onUserInteraction()
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        },
+                                        onClearClick = {
+                                            viewModel.clearCell()
+                                            viewModel.onUserInteraction()
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        },
+                                        onHintClick = {
+                                            viewModel.requestHint()
+                                            viewModel.onUserInteraction()
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
+                                    )
+                                }
+                            }
                         } else {
-                            AccessibleGameGrid(
-                                state = uiState,
-                                gridSize = gridSize,
-                                isTv = isTv,
-                                onCellClick = { x, y ->
-                                    viewModel.onCellClicked(x, y)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+                                ZoomableGameGrid(
+                                    state = uiState,
+                                    gridSize = gridSize,
+                                    scale = scale,
+                                    onScaleChange = { scale = it },
+                                    isTv = isTv,
+                                    onCellClick = { x, y ->
+                                        viewModel.onCellClicked(x, y)
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                )
+                                if (uiState.uiVisible) {
+                                    androidx.compose.material3.Slider(
+                                        value = scale.coerceIn(0.85f, 3f),
+                                        onValueChange = { scale = it.coerceIn(0.85f, 3f) },
+                                        valueRange = 0.85f..3f,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .width(140.dp)
+                                            .padding(8.dp)
+                                    )
                                 }
-                            )
+                            }
                         }
                     } else {
                         Box(
@@ -335,7 +397,7 @@ fun GameScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Input Controls - auto-hides in immersive/focus mode
                     AnimatedVisibility(
@@ -346,6 +408,7 @@ fun GameScreen(
                         AccessibleInputPad(
                             size = uiState.size,
                             isNoteMode = uiState.isInputtingNotes,
+                            screenWidth = screenWidth,
                             isZeroInclusive = uiState.gameMode == org.yegie.keenkenning.data.GameMode.ZERO_INCLUSIVE,
                             isNegativeMode = uiState.gameMode == org.yegie.keenkenning.data.GameMode.NEGATIVE_NUMBERS,
                             showHintButton = uiState.gameMode == org.yegie.keenkenning.data.GameMode.HINT_MODE,
@@ -584,6 +647,7 @@ private fun TopBar(
     onToggleHints: () -> Unit,
     onShowInfo: () -> Unit,
     onShowSettings: () -> Unit,
+    onSetLayoutPreset: (LayoutPreset) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     gridSize: Int = 0,
     difficultyName: String = "Easy",
@@ -742,6 +806,19 @@ private fun TopBar(
                         Icon(Icons.Default.Info, contentDescription = null)
                     }
                 )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Layout: Compact") },
+                    onClick = { onSetLayoutPreset(LayoutPreset.Compact); showMenu = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("Layout: Medium") },
+                    onClick = { onSetLayoutPreset(LayoutPreset.Medium); showMenu = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("Layout: Spacious") },
+                    onClick = { onSetLayoutPreset(LayoutPreset.Spacious); showMenu = false }
+                )
             }
         }
     }
@@ -799,25 +876,62 @@ private fun CompactVictoryBanner() {
     }
 }
 
-@Suppress("UNUSED_PARAMETER")  // isLargeScreen reserved for responsive layout
 @Composable
 private fun calculateGridSize(
     screenWidth: Dp,
     screenHeight: Dp,
     puzzleSize: Int,
-    isLargeScreen: Boolean
+    isLargeScreen: Boolean,
+    preset: LayoutPreset
 ): Dp {
-    // Reserve space for header (~50dp), controls (~180dp), and padding
-    val availableHeight = screenHeight - 250.dp
-    val availableWidth = screenWidth - 16.dp
+    val dimensions = if (isLargeScreen) LargeGameDimensions else GameDimensions()
 
-    // Use the smaller dimension to ensure square grid fits
+    // Calculate actual UI space requirements
+    val topBarHeight = 80.dp  // Top bar with badges and timer
+    val topSpacer = 8.dp      // Spacer after top bar
+    val gridToButtonsSpacer = when (preset) {
+        LayoutPreset.Compact -> 4.dp
+        LayoutPreset.Medium -> 8.dp
+        LayoutPreset.Spacious -> 12.dp
+    }
+
+    // Input pad varies by puzzle size
+    val buttonRows = when {
+        puzzleSize <= 5 -> 1  // Single row
+        puzzleSize <= 10 -> 2  // Two rows
+        else -> 3  // Three rows for 11-16
+    }
+    val inputPadHeight = (dimensions.buttonMinSize * buttonRows) +
+                        (dimensions.controlSpacing * (buttonRows - 1)) +  // Row spacing
+                        37.dp +  // Visual separator (3*12dp + 1dp)
+                        dimensions.buttonMinSize  // Tool buttons row
+
+    val columnPadding = dimensions.gridPadding * 2  // Top and bottom
+
+    // Total reserved space
+    val reservedSpace = topBarHeight + topSpacer + gridToButtonsSpacer +
+                       inputPadHeight + columnPadding
+
+    // Calculate available space
+    val availableHeight = screenHeight - reservedSpace
+    val availableWidth = screenWidth - (dimensions.gridPadding * 2)
+
+    // Use smaller dimension to ensure square grid fits
     val maxGridSize = min(availableWidth.value, availableHeight.value).dp
 
-    // Ensure minimum cell size for touch targets (48dp)
-    val minGridSize = (48 * puzzleSize).dp
+    // Ensure grid uses at least 50% of screen height
+    val minGridFromScreen = screenHeight * when (preset) {
+        LayoutPreset.Compact -> if (isLargeScreen) 0.85f else 0.70f
+        LayoutPreset.Medium -> if (isLargeScreen) 0.75f else 0.60f
+        LayoutPreset.Spacious -> if (isLargeScreen) 0.65f else 0.50f
+    }
 
-    return maxGridSize.coerceAtLeast(minGridSize)
+    // Ensure minimum cell size for touch targets (48dp WCAG minimum)
+    val minGridFromCells = (48 * puzzleSize).dp
+
+    // Choose desired size favoring puzzle area, then clamp to available space
+    val desired = maxOf(minGridFromScreen, minGridFromCells)
+    return desired.coerceAtMost(maxGridSize)
 }
 
 @Composable
@@ -876,6 +990,8 @@ private fun AccessibleGameGrid(
 private fun ZoomableGameGrid(
     state: GameUiState,
     gridSize: Dp,
+    scale: Float,
+    onScaleChange: (Float) -> Unit,
     isTv: Boolean = false,
     onCellClick: (Int, Int) -> Unit
 ) {
@@ -1011,8 +1127,19 @@ private fun AccessibleCellView(
 
     // Zone-based background color for visual grouping
     val zoneColor = remember(cell.zoneId, colorblindMode) {
-        ZoneColors.forZone(cell.zoneId, highContrast = colorblindMode == ColorblindMode.HIGH_CONTRAST)
-            .forColorblindMode(colorblindMode)
+        ZoneColors.forZone(
+            cell.zoneId,
+            highContrast = colorblindMode == ColorblindMode.HIGH_CONTRAST,
+            palette = when (colorblindMode) {
+                ColorblindMode.DEUTERANOPIA -> ZoneColors.Palette.DEUTERANOPIA
+                ColorblindMode.PROTANOPIA -> ZoneColors.Palette.PROTANOPIA
+                ColorblindMode.TRITANOPIA -> ZoneColors.Palette.TRITANOPIA
+                ColorblindMode.TETARTANOPIA -> ZoneColors.Palette.TETARTANOPIA
+                ColorblindMode.ACHROMATOPSIA -> ZoneColors.Palette.ACHROMATOPSIA
+                ColorblindMode.HIGH_CONTRAST -> ZoneColors.Palette.HIGH
+                ColorblindMode.NORMAL -> ZoneColors.Palette.BASE
+            }
+        )
     }
 
     val backgroundColor by animateColorAsState(
@@ -1033,25 +1160,21 @@ private fun AccessibleCellView(
     val cageBorderWidth = dimensions.cageBorderWidth
     val gridBorderWidth = dimensions.gridBorderWidth
 
-    val valueTextSize = when {
+    val fontScale = 1.0f
+    val valueBase = when {
         puzzleSize <= 4 -> 28.sp
         puzzleSize <= 6 -> 24.sp
         puzzleSize <= 8 -> 20.sp
         else -> 18.sp
     }
+    val valueTextSize = (valueBase.value * fontScale).sp
 
-    val clueTextSize = when {
-        puzzleSize <= 4 -> 12.sp
-        puzzleSize <= 6 -> 11.sp
-        puzzleSize <= 8 -> 10.sp
-        else -> 9.sp
-    }
-
-    val noteTextSize = when {
+    val noteBase = when {
         puzzleSize <= 4 -> 10.sp
         puzzleSize <= 6 -> 9.sp
         else -> 8.sp
     }
+    val noteTextSize = (noteBase.value * fontScale.coerceAtMost(1.25f)).sp
 
     BoxWithConstraints(
         modifier = modifier
@@ -1105,13 +1228,45 @@ private fun AccessibleCellView(
         val hasClue = cell.clue != null
         // Capture maxWidth from BoxWithConstraintsScope for use in inner Box
         val availableWidth = maxWidth
+        val cellHeight = maxHeight
+
+        // Responsive clue text size based on cell size
+        val clueTextSize = with(LocalDensity.current) {
+            val cellSizePx = maxWidth.toPx()
+            val baseSizeForPuzzle = when {
+                puzzleSize <= 4 -> 12.sp
+                puzzleSize <= 6 -> 11.sp
+                puzzleSize <= 8 -> 10.sp
+                else -> 9.sp
+            }
+            // Scale down proportionally for smaller cells (e.g., 9x9 grids have smaller cells)
+            // Target: reduce clue footprint from 54% to ~30% of cell on large grids
+            val scaleFactor = (cellSizePx / 60f).coerceIn(0.7f, 1.0f)
+            (baseSizeForPuzzle.value * scaleFactor).sp
+        }
+
+        // Track clue bounds dynamically
+        var clueHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+
+        // Calculate spatial padding dynamically based on cell size
+        val contentPadding = remember(availableWidth) {
+            val cellWidthValue = availableWidth.value
+            // 12% of cell width, minimum 8dp for touch targets
+            (availableWidth * 0.12f).coerceAtLeast(8.dp)
+        }
 
         // Z-Index Layer 1: Clue (Top-Left Quadrant Reservation)
         if (hasClue) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .zIndex(1f), // Ensure clue is above other content visually
+                    .zIndex(1f) // Ensure clue is above other content visually
+                    .onGloballyPositioned { coordinates ->
+                        clueHeight = with(density) {
+                            coordinates.size.height.toDp()
+                        }
+                    },
                 shape = RoundedCornerShape(dimensions.clueBoxCornerRadius),
                 color = colors.surfaceDim,
                 shadowElevation = dimensions.clueBoxElevation,
@@ -1136,8 +1291,15 @@ private fun AccessibleCellView(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = if (hasClue) 16.dp else 0.dp), // Reserve space for clue
-            contentAlignment = Alignment.Center
+                .padding(
+                    top = if (hasClue && clueHeight > 0.dp) {
+                        clueHeight + contentPadding
+                    } else contentPadding / 2,
+                    bottom = contentPadding / 2,
+                    start = contentPadding / 2,
+                    end = contentPadding / 2
+                ),
+            contentAlignment = Alignment.TopCenter  // Changed from Center
         ) {
             if (cell.value != null && cell.value != -1) {
                 // Main Value
@@ -1253,28 +1415,37 @@ private fun BoxScope.AccessibleNoteGrid(
         else -> 5
     }
 
-    val noteBoxSize = if (cellWidth > 0.dp) {
-        cellWidth * noteBoxSizeRatio
-    } else {
-        when {
-            puzzleSize <= 6 -> 10.dp
-            puzzleSize <= 9 -> 8.dp
-            else -> 7.dp
-        }
+    val noteBoxSize = with(LocalDensity.current) {
+        val cellSizeDp = cellWidth
+        val gridDim = if (puzzleSize <= 9) 3 else 4
+
+        // Dynamic: 28% of cell, divided by grid dimension
+        val calculatedSize = (cellSizeDp * 0.28f) / gridDim
+
+        // Ensure minimum touch target (WCAG)
+        calculatedSize.coerceAtLeast(8.dp)
     }
 
     val noteSize = when {
         puzzleSize <= 4 -> 10.sp
         puzzleSize <= 6 -> 9.sp
-        puzzleSize <= 9 -> 7.sp
-        else -> 6.sp
+        puzzleSize <= 9 -> 8.sp  // Increased from 7.sp for better readability
+        else -> 7.sp             // Increased from 6.sp
     }
 
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .background(colors.surface.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-            .padding(1.dp),
+            .background(
+                colors.surface.copy(alpha = 0.95f),  // Increased from 0.5f
+                RoundedCornerShape(4.dp)             // Increased from 2.dp
+            )
+            .border(
+                width = 1.dp,
+                color = colors.noteText.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(2.dp),  // Increased from 1.dp for border
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -1311,6 +1482,7 @@ private fun BoxScope.AccessibleNoteGrid(
 private fun AccessibleInputPad(
     size: Int,
     isNoteMode: Boolean,
+    screenWidth: Dp = 0.dp,
     isZeroInclusive: Boolean = false,
     isNegativeMode: Boolean = false,
     showHintButton: Boolean = false,
@@ -1349,7 +1521,9 @@ private fun AccessibleInputPad(
                 rowNums.forEach { num ->
                     NumberButton(
                         number = num,
-                        onClick = { onNumberClick(num) }
+                        onClick = { onNumberClick(num) },
+                        puzzleSize = size,
+                        screenWidth = screenWidth
                     )
                 }
             }
@@ -1465,18 +1639,27 @@ private fun AccessibleInputPad(
 @Composable
 private fun NumberButton(
     number: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    puzzleSize: Int = 0,
+    screenWidth: Dp = 0.dp
 ) {
     val dimensions = LocalGameDimensions.current
     // Use hex display for extended grids (10-16)
     val displayText = valueToDisplay(number)
     val description = if (number > 9) "$displayText ($number)" else displayText
 
+    // Calculate responsive button size if parameters provided
+    val buttonSize = if (puzzleSize > 0 && screenWidth > 0.dp) {
+        dimensions.getResponsiveButtonSize(puzzleSize, screenWidth)
+    } else {
+        dimensions.buttonMinSize
+    }
+
     // Rounded rectangles reduce cognitive load vs circles (research-backed)
     // 12dp radius is optimal for neurodivergent-friendly design
     Surface(
         modifier = Modifier
-            .size(dimensions.buttonMinSize)
+            .size(buttonSize)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClickLabel = "Enter $description") { onClick() }
             .semantics { contentDescription = "Number $description" },
